@@ -10,6 +10,8 @@ type Screen = 'home' | 'tests' | 'newTest' | 'entry' | 'history' | 'settings' | 
 type UnitSystem = 'metric' | 'imperial';
 
 const screenshotMode = process.env.EXPO_PUBLIC_SCREENSHOT_MODE === '1';
+const screenshotRoute = process.env.EXPO_PUBLIC_SCREENSHOT_ROUTE as Screen | undefined;
+const screenshotLanguage = process.env.EXPO_PUBLIC_SCREENSHOT_LANG as Language | undefined;
 const screenshotMeasurements: Measurement[] = [
   { id: 'demo-1', measuredAt: '2026-08-17T12:00:00.000Z', phase: 'before', electricityKwh: 7.4, heatKwh: 24.1, outsideC: 2.1, roomC: 21.0, compressorStarts: 14, flowC: 39, returnC: 32, compressorHours: 6.0, hotWaterKwh: 3.2 },
   { id: 'demo-2', measuredAt: '2026-08-18T12:00:00.000Z', phase: 'before', electricityKwh: 7.1, heatKwh: 23.8, outsideC: 2.8, roomC: 21.1, compressorStarts: 13, flowC: 38, returnC: 32, compressorHours: 6.1, hotWaterKwh: 3.0 },
@@ -93,9 +95,9 @@ const extra = {
 } as const;
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('home');
-  const [language, setLanguage] = useState<Language>(() => Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase().startsWith('de') ? 'de' : 'en');
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => Intl.DateTimeFormat().resolvedOptions().locale.toUpperCase().includes('-US') ? 'imperial' : 'metric');
+  const [screen, setScreen] = useState<Screen>(() => screenshotMode && screenshotRoute ? screenshotRoute : 'home');
+  const [language, setLanguage] = useState<Language>(() => screenshotMode && screenshotLanguage ? screenshotLanguage : Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase().startsWith('de') ? 'de' : 'en');
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => screenshotMode && screenshotLanguage ? (screenshotLanguage === 'en' ? 'imperial' : 'metric') : Intl.DateTimeFormat().resolvedOptions().locale.toUpperCase().includes('-US') ? 'imperial' : 'metric');
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [profile, setProfile] = useState<SystemProfile>({ manufacturer: '', model: '', buildingArea: '', constructionYear: '', heatDistribution: 'floor', electricityPrice: '0.32' });
