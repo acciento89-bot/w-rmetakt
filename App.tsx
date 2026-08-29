@@ -19,7 +19,7 @@ const screenshotMeasurements: Measurement[] = [
   { id: 'demo-6', measuredAt: '2026-08-26T12:00:00.000Z', phase: 'after', electricityKwh: 5.2, heatKwh: 21.5, outsideC: 4.4, roomC: 21.0, compressorStarts: 7, flowC: 33, returnC: 28, compressorHours: 6.6, hotWaterKwh: 2.7 },
 ];
 const screenshotExperiment: Experiment = { id: 'demo-test', setting: 'heatingCurve', previousValue: '0.6', newValue: '0.5', unit: '', durationDays: 14, startedAt: '2026-08-22T12:00:00.000Z', status: 'active' };
-const screenshotProfile: SystemProfile = { manufacturer: 'Vaillant', model: 'aroTHERM plus', buildingArea: '165', constructionYear: '2018', heatDistribution: 'floor', electricityPrice: '0.32' };
+const screenshotProfile: SystemProfile = { manufacturer: 'Vaillant', model: 'aroTHERM plus', buildingArea: '165', constructionYear: '2018', heatDistribution: 'floor', electricityPrice: '0' };
 
 const colors = {
   night: '#0B2422', forest: '#123A35', pine: '#185147', teal: '#16796A', leaf: '#32A77B',
