@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Linking, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Linking, NativeModules, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { database, Experiment, Measurement, SystemProfile } from './src/database';
 import { analyzeMeasurements, InsightKey } from './src/domain';
 import { flowStrings, Language, strings, unitStrings } from './src/i18n';
@@ -10,8 +10,9 @@ type Screen = 'home' | 'tests' | 'newTest' | 'entry' | 'history' | 'settings' | 
 type UnitSystem = 'metric' | 'imperial';
 
 const screenshotMode = process.env.EXPO_PUBLIC_SCREENSHOT_MODE === '1';
-const screenshotRoute = process.env.EXPO_PUBLIC_SCREENSHOT_ROUTE as Screen | undefined;
-const screenshotLanguage = process.env.EXPO_PUBLIC_SCREENSHOT_LANG as Language | undefined;
+const screenshotSettings = NativeModules.SettingsManager?.settings ?? {};
+const screenshotRoute = (process.env.EXPO_PUBLIC_SCREENSHOT_ROUTE ?? screenshotSettings.ScreenshotRoute) as Screen | undefined;
+const screenshotLanguage = (process.env.EXPO_PUBLIC_SCREENSHOT_LANG ?? screenshotSettings.ScreenshotLanguage) as Language | undefined;
 const screenshotMeasurements: Measurement[] = [
   { id: 'demo-1', measuredAt: '2026-08-17T12:00:00.000Z', phase: 'before', electricityKwh: 7.4, heatKwh: 24.1, outsideC: 2.1, roomC: 21.0, compressorStarts: 14, flowC: 39, returnC: 32, compressorHours: 6.0, hotWaterKwh: 3.2 },
   { id: 'demo-2', measuredAt: '2026-08-18T12:00:00.000Z', phase: 'before', electricityKwh: 7.1, heatKwh: 23.8, outsideC: 2.8, roomC: 21.1, compressorStarts: 13, flowC: 38, returnC: 32, compressorHours: 6.1, hotWaterKwh: 3.0 },
