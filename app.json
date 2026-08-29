@@ -3,10 +3,16 @@
     "name": "WärmeTakt",
     "slug": "waermetakt",
     "version": "1.0.0",
+    "scheme": "waermetakt",
     "description": "Herstellerunabhängige Effizienzanalyse für Wärmepumpen.",
     "githubUrl": "https://github.com/acciento89-bot/w-rmetakt",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#102A2B"
+    },
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
@@ -17,7 +23,7 @@
       "package": "de.kamilunavo.waermetakt",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#102A2B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

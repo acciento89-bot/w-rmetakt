@@ -10,6 +10,8 @@ WärmeTakt macht Einstellungsänderungen an Wärmepumpen messbar. Die App vergle
 - COP, Verdichterstarts und Raumkomfort auf einen Blick
 - Geführte Einstellungstests
 - Vorbereitung für den einmaligen In-App-Kauf `WärmeTakt Pro`
+- Geführter Test-Assistent mit Free-Limit und dauerhafter Pro-Freischaltung
+- Celsius und Fahrenheit für den internationalen Einsatz
 
 ## Geschäftsmodell
 
@@ -24,5 +26,7 @@ npm run typecheck
 ```
 
 Technik: Expo SDK 57, React Native, TypeScript und Expo SQLite.
+
+In-App-Produkt: `de.kamilunavo.waermetakt.pro` (nicht verbrauchbar).
 
 Bundle-ID iOS / Paketname Android: `de.kamilunavo.waermetakt`
