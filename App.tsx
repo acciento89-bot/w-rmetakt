@@ -1,13 +1,25 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Linking, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { database, Experiment, Measurement, SystemProfile } from './src/database';
 import { analyzeMeasurements, InsightKey } from './src/domain';
 import { flowStrings, Language, strings, unitStrings } from './src/i18n';
 import { useProPurchase } from './src/useProPurchase';
 
-type Screen = 'home' | 'tests' | 'newTest' | 'entry' | 'history' | 'settings';
+type Screen = 'home' | 'tests' | 'newTest' | 'entry' | 'history' | 'settings' | 'pro';
 type UnitSystem = 'metric' | 'imperial';
+
+const screenshotMode = process.env.EXPO_PUBLIC_SCREENSHOT_MODE === '1';
+const screenshotMeasurements: Measurement[] = [
+  { id: 'demo-1', measuredAt: '2026-08-17T12:00:00.000Z', phase: 'before', electricityKwh: 7.4, heatKwh: 24.1, outsideC: 2.1, roomC: 21.0, compressorStarts: 14, flowC: 39, returnC: 32, compressorHours: 6.0, hotWaterKwh: 3.2 },
+  { id: 'demo-2', measuredAt: '2026-08-18T12:00:00.000Z', phase: 'before', electricityKwh: 7.1, heatKwh: 23.8, outsideC: 2.8, roomC: 21.1, compressorStarts: 13, flowC: 38, returnC: 32, compressorHours: 6.1, hotWaterKwh: 3.0 },
+  { id: 'demo-3', measuredAt: '2026-08-19T12:00:00.000Z', phase: 'before', electricityKwh: 6.8, heatKwh: 23.1, outsideC: 3.5, roomC: 21.0, compressorStarts: 12, flowC: 38, returnC: 31, compressorHours: 6.2, hotWaterKwh: 2.9 },
+  { id: 'demo-4', measuredAt: '2026-08-24T12:00:00.000Z', phase: 'after', electricityKwh: 5.7, heatKwh: 22.4, outsideC: 3.0, roomC: 21.0, compressorStarts: 8, flowC: 34, returnC: 29, compressorHours: 6.4, hotWaterKwh: 2.8 },
+  { id: 'demo-5', measuredAt: '2026-08-25T12:00:00.000Z', phase: 'after', electricityKwh: 5.5, heatKwh: 22.0, outsideC: 3.8, roomC: 21.1, compressorStarts: 7, flowC: 34, returnC: 29, compressorHours: 6.5, hotWaterKwh: 2.9 },
+  { id: 'demo-6', measuredAt: '2026-08-26T12:00:00.000Z', phase: 'after', electricityKwh: 5.2, heatKwh: 21.5, outsideC: 4.4, roomC: 21.0, compressorStarts: 7, flowC: 33, returnC: 28, compressorHours: 6.6, hotWaterKwh: 2.7 },
+];
+const screenshotExperiment: Experiment = { id: 'demo-test', setting: 'heatingCurve', previousValue: '0.6', newValue: '0.5', unit: '', durationDays: 14, startedAt: '2026-08-22T12:00:00.000Z', status: 'active' };
+const screenshotProfile: SystemProfile = { manufacturer: 'Vaillant', model: 'aroTHERM plus', buildingArea: '165', constructionYear: '2018', heatDistribution: 'floor', electricityPrice: '0.32' };
 
 const colors = {
   night: '#0B2422', forest: '#123A35', pine: '#185147', teal: '#16796A', leaf: '#32A77B',
@@ -93,11 +105,35 @@ export default function App() {
 
   useEffect(() => {
     database.initialize().then(async () => {
-      setMeasurements(await database.listMeasurements());
-      setExperiments(await database.listExperiments());
-      setProfile(await database.getProfile());
+      let storedMeasurements = await database.listMeasurements();
+      let storedExperiments = await database.listExperiments();
+      if (screenshotMode && storedMeasurements.length === 0) {
+        await Promise.all(screenshotMeasurements.map((item) => database.saveMeasurement(item)));
+        await database.saveExperiment(screenshotExperiment);
+        await database.saveProfile(screenshotProfile);
+        storedMeasurements = await database.listMeasurements();
+        storedExperiments = await database.listExperiments();
+      }
+      setMeasurements(storedMeasurements);
+      setExperiments(storedExperiments);
+      setProfile(screenshotMode ? screenshotProfile : await database.getProfile());
       setIsReady(true);
     });
+  }, []);
+
+  useEffect(() => {
+    if (!screenshotMode) return;
+    const openScreenshotRoute = (url: string | null) => {
+      if (!url) return;
+      const route = url.replace(/^.*?:\/\//, '').split('?')[0] as Screen;
+      const lang = /(?:\?|&)lang=en(?:&|$)/.test(url) ? 'en' : 'de';
+      if (['home', 'tests', 'history', 'settings', 'pro'].includes(route)) setScreen(route);
+      setLanguage(lang);
+      setUnitSystem(lang === 'en' ? 'imperial' : 'metric');
+    };
+    void Linking.getInitialURL().then(openScreenshotRoute);
+    const subscription = Linking.addEventListener('url', ({ url }) => openScreenshotRoute(url));
+    return () => subscription.remove();
   }, []);
 
   const analysis = useMemo(() => analyzeMeasurements(measurements), [measurements]);
@@ -115,6 +151,7 @@ export default function App() {
       {screen === 'entry' && <Entry t={t} language={language} unitSystem={unitSystem} onSave={saveMeasurement} />}
       {screen === 'history' && <History t={t} language={language} unitSystem={unitSystem} measurements={measurements} analysis={analysis} />}
       {screen === 'settings' && <Settings t={t} language={language} unitSystem={unitSystem} purchase={purchase} profile={profile} onProfile={saveProfile} onLanguage={setLanguage} onUnitSystem={setUnitSystem} />}
+      {screen === 'pro' && <ProReview t={t} language={language} />}
     </View>
     <Navigation screen={screen} setScreen={setScreen} t={t} />
   </View></SafeAreaView>;
@@ -227,6 +264,20 @@ function Settings({ t, language, unitSystem, purchase, profile, onProfile, onLan
   </ScrollView>;
 }
 
+function ProReview({ t, language }: { t: any; language: Language }) {
+  const price = language === 'de' ? '39,99 €' : '$39.99';
+  const benefits = language === 'de'
+    ? ['Unbegrenzte Optimierungstests', 'Wetterbereinigte Vorher-/Nachher-Analyse', 'Detaillierte Anlagenwerte & Empfehlungen', 'Einmal kaufen – dauerhaft nutzen']
+    : ['Unlimited optimization tests', 'Weather-adjusted before/after analysis', 'Detailed system metrics & recommendations', 'One purchase — lifetime access'];
+  return <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <Text style={styles.eyebrow}>WÄRMETAKT PRO</Text><Text style={styles.title}>{t.unlockTitle}</Text><Text style={styles.subtitle}>{t.unlockText}</Text>
+    <View style={styles.proCard}><Text style={styles.proCardEyebrow}>PRO LIFETIME</Text><Text style={styles.proCardTitle}>{language === 'de' ? 'Mehr verstehen. Besser einstellen.' : 'Understand more. Tune smarter.'}</Text>
+      {benefits.map((benefit) => <View key={benefit} style={styles.proBenefit}><View style={styles.proBenefitDot}><Text style={styles.proBenefitCheck}>✓</Text></View><Text style={styles.proBenefitText}>{benefit}</Text></View>)}
+      <Text style={styles.price}>{price} <Text style={styles.once}>{t.once}</Text></Text><Pressable style={styles.proButton}><Text style={styles.proButtonText}>{t.unlock}</Text></Pressable><Text style={styles.restore}>{t.restore}</Text>
+    </View><Text style={styles.disclaimer}>{t.disclaimer}</Text>
+  </ScrollView>;
+}
+
 function Field({ label, unit, value, onChange }: any) { return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.inputWrap}><TextInput style={styles.input} value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder="0.0" accessibilityLabel={label} /><Text style={styles.unit}>{unit}</Text></View></View>; }
 function TextField({ label, value, onChange }: any) { return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.inputWrap}><TextInput style={styles.input} value={value} onChangeText={onChange} autoCapitalize="words" accessibilityLabel={label} /></View></View>; }
 function Segment<T extends string | number>({ options, value, onChange }: { options: Array<{ value: T; label: string }>; value: T; onChange: (value: T) => void }) { return <View style={styles.segment}>{options.map((option) => <Pressable key={String(option.value)} style={[styles.segmentItem, value === option.value && styles.segmentActive]} onPress={() => onChange(option.value)}><Text numberOfLines={2} style={[styles.segmentText, value === option.value && styles.segmentTextActive]}>{option.label}</Text></Pressable>)}</View>; }
@@ -270,7 +321,9 @@ const styles = StyleSheet.create({
   formCard: { backgroundColor: colors.surface, borderRadius: 21, padding: 17, borderWidth: 1, borderColor: colors.sage }, field: { marginBottom: 15 }, fieldLabel: { color: colors.ink, fontSize: 12, fontWeight: '800', marginBottom: 7 }, inputWrap: { minHeight: 49, borderWidth: 1, borderColor: colors.line, borderRadius: 13, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.pale }, input: { flex: 1, color: colors.ink, fontSize: 16, fontWeight: '800', paddingHorizontal: 13, height: 49 }, unit: { color: colors.muted, fontSize: 11, fontWeight: '800', paddingRight: 13 }, formHint: { color: colors.muted, fontSize: 10, lineHeight: 15, textAlign: 'center', marginTop: 11 },
   segment: { flexDirection: 'row', backgroundColor: colors.sage, padding: 4, borderRadius: 13 }, segmentItem: { flex: 1, minHeight: 39, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderRadius: 10 }, segmentActive: { backgroundColor: colors.pine }, segmentText: { color: colors.muted, fontWeight: '800', fontSize: 10, textAlign: 'center' }, segmentTextActive: { color: colors.white }, fieldGap: { height: 17 },
   settingsCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 17, borderWidth: 1, borderColor: colors.sage, marginTop: 17 }, secondaryGreenButton: { minHeight: 50, borderRadius: 15, borderWidth: 1, borderColor: colors.teal, alignItems: 'center', justifyContent: 'center', marginTop: 10, backgroundColor: colors.pale }, secondaryGreenText: { color: colors.teal, fontWeight: '900', fontSize: 13 },
-  proCard: { backgroundColor: colors.night, borderRadius: 24, padding: 21, marginTop: 17 }, proCardEyebrow: { color: colors.lime, fontSize: 9, fontWeight: '900', letterSpacing: 1.7 }, proCardTitle: { color: colors.white, fontSize: 23, fontWeight: '900', marginTop: 8 }, proCardText: { color: colors.sage, fontSize: 12, lineHeight: 19, marginTop: 7 }, price: { color: colors.white, fontSize: 26, fontWeight: '900', marginTop: 17 }, once: { color: colors.sage, fontSize: 11, fontWeight: '500' }, proButton: { backgroundColor: colors.lime, borderRadius: 14, padding: 15, alignItems: 'center', marginTop: 14 }, proButtonText: { color: colors.night, fontWeight: '900' }, restore: { color: colors.sage, textAlign: 'center', fontSize: 10, marginTop: 12 }, purchaseError: { color: '#FFB7A8', textAlign: 'center', fontSize: 10, lineHeight: 15, marginTop: 9 }, version: { color: colors.muted, textAlign: 'center', fontSize: 9, marginTop: 17 },
+  proCard: { backgroundColor: colors.night, borderRadius: 24, padding: 21, marginTop: 17 }, proCardEyebrow: { color: colors.lime, fontSize: 9, fontWeight: '900', letterSpacing: 1.7 }, proCardTitle: { color: colors.white, fontSize: 23, fontWeight: '900', marginTop: 8 }, proCardText: { color: colors.sage, fontSize: 12, lineHeight: 19, marginTop: 7 },
+  proBenefit: { flexDirection: 'row', alignItems: 'center', marginTop: 15 }, proBenefitDot: { width: 25, height: 25, borderRadius: 13, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center', marginRight: 10 }, proBenefitCheck: { color: colors.lime, fontSize: 12, fontWeight: '900' }, proBenefitText: { color: colors.mist, fontSize: 12, fontWeight: '700', flex: 1, lineHeight: 17 },
+  price: { color: colors.white, fontSize: 26, fontWeight: '900', marginTop: 17 }, once: { color: colors.sage, fontSize: 11, fontWeight: '500' }, proButton: { backgroundColor: colors.lime, borderRadius: 14, padding: 15, alignItems: 'center', marginTop: 14 }, proButtonText: { color: colors.night, fontWeight: '900' }, restore: { color: colors.sage, textAlign: 'center', fontSize: 10, marginTop: 12 }, purchaseError: { color: '#FFB7A8', textAlign: 'center', fontSize: 10, lineHeight: 15, marginTop: 9 }, version: { color: colors.muted, textAlign: 'center', fontSize: 9, marginTop: 17 },
   wizardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }, stepLabel: { color: colors.muted, fontSize: 11, fontWeight: '800' }, optionCard: { minHeight: 55, borderRadius: 15, borderWidth: 1, borderColor: colors.sage, backgroundColor: colors.surface, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', marginBottom: 9 }, optionActive: { borderColor: colors.teal, backgroundColor: colors.mist }, optionText: { color: colors.ink, fontSize: 13, fontWeight: '800', flex: 1 }, optionTextActive: { color: colors.pine }, radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.teal, marginRight: 11 }, radioActive: { borderWidth: 5, borderColor: colors.teal },
   infoCard: { backgroundColor: colors.mist, borderRadius: 15, padding: 14, marginTop: 12, borderWidth: 1, borderColor: colors.sage }, infoTitle: { color: colors.pine, fontSize: 12, fontWeight: '900' }, infoText: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 5 }, summaryCard: { backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.sage, paddingHorizontal: 16 }, summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.line }, summaryLabel: { color: colors.muted, fontSize: 11 }, summaryValue: { color: colors.ink, fontSize: 12, fontWeight: '900', maxWidth: '62%', textAlign: 'right' },
   confirmCard: { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.sage, padding: 14, flexDirection: 'row', alignItems: 'flex-start', marginTop: 13 }, confirmActive: { borderColor: colors.teal, backgroundColor: colors.mist }, checkbox: { width: 21, height: 21, borderRadius: 6, borderWidth: 2, borderColor: colors.teal, marginRight: 10, alignItems: 'center', justifyContent: 'center' }, checkboxActive: { backgroundColor: colors.teal }, checkmark: { color: colors.white, fontWeight: '900' }, confirmText: { color: colors.ink, fontSize: 11, lineHeight: 17, flex: 1 }, wizardActions: { flexDirection: 'row', gap: 9, marginTop: 1 }, wizardPrimary: { flex: 1 }, secondaryButton: { flex: 0.65, minHeight: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 17, borderWidth: 1, borderColor: colors.teal, backgroundColor: colors.pale }, secondaryButtonText: { color: colors.teal, fontSize: 13, fontWeight: '900' }, disabledButton: { opacity: 0.5 },
