@@ -1,0 +1,55 @@
+name: WärmeTakt Android Release
+
+on:
+  pull_request:
+    paths:
+      - "App.tsx"
+      - "app.json"
+      - "eas.json"
+      - "src/**"
+      - "assets/**"
+      - "package*.json"
+      - ".github/workflows/android-release.yml"
+  push:
+    branches: [main]
+    paths:
+      - "App.tsx"
+      - "app.json"
+      - "eas.json"
+      - "src/**"
+      - "assets/**"
+      - "package*.json"
+      - ".github/workflows/android-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Validate Play identity
+        run: |
+          node -e "const a=require('./app.json').expo; if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==3||a.version!=='1.0.1') process.exit(1)"
+          ! grep -R -E -i "webview|loadurl|localhost" App.tsx src
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Build release AAB
+        run: ./android/gradlew -p android bundleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waermetakt-android-unsigned-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
