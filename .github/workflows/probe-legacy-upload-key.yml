@@ -8,14 +8,22 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   probe:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
       - uses: actions/setup-java@v5
         with: {distribution: temurin, java-version: '17'}
-      - name: Report legacy certificate fingerprint only
+
+      - name: Check old GitHub secret names without exposing values
         shell: bash
         env:
           K1: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
@@ -28,12 +36,59 @@ jobs:
           P4: ${{ secrets.UPLOAD_STORE_PASSWORD }}
         run: |
           set -euo pipefail
-          b64=''; source=''
-          for item in K1 K2 K3 K4; do value=${!item:-}; if [ -n "$value" ]; then b64="$value"; source="$item"; break; fi; done
-          pass=''
-          for item in P1 P2 P3 P4; do value=${!item:-}; if [ -n "$value" ]; then pass="$value"; break; fi; done
-          if [ -z "$b64" ] || [ -z "$pass" ]; then echo 'NO_LEGACY_KEY_MATERIAL'; exit 0; fi
-          echo "FOUND_LEGACY_KEY_MATERIAL:$source"
-          printf '%s' "$b64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
-          keytool -list -v -keystore "$RUNNER_TEMP/upload.jks" -storepass "$pass" | grep -E 'SHA1:|SHA256:'
-          rm -f "$RUNNER_TEMP/upload.jks"
+          found=0
+          for item in K1 K2 K3 K4; do value=${!item:-}; if [ -n "$value" ]; then echo "LEGACY_KEY_SECRET_PRESENT:$item"; found=1; fi; done
+          for item in P1 P2 P3 P4; do value=${!item:-}; if [ -n "$value" ]; then echo "LEGACY_PASSWORD_SECRET_PRESENT:$item"; found=1; fi; done
+          if [ "$found" -eq 0 ]; then echo 'NO_LEGACY_GITHUB_SECRET_MATERIAL'; fi
+
+      - name: Download historical signed release AAB from run 34693654731
+        uses: actions/download-artifact@v4
+        with:
+          name: waermetakt-1.0.2-4-android-release
+          path: historical
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '34693654731'
+
+      - name: Read historical AAB signer fingerprint only
+        id: historical
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAB=$(find historical -type f -name '*.aab' -print -quit)
+          test -s "$AAB"
+          fp=$(keytool -printcert -jarfile "$AAB" | sed -n 's/^[[:space:]]*SHA256: //p' | head -n1 | tr -d ':')
+          test -n "$fp"
+          echo "HISTORICAL_SHA256=$fp"
+          echo "fingerprint=$fp" >> "$GITHUB_OUTPUT"
+
+      - name: Generate the same Expo Android project used by the historical release
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          rm -rf android
+          npx expo prebuild --platform android --no-install
+          test -s android/app/debug.keystore
+
+      - name: Compare Expo-generated keystore with historical AAB signer
+        shell: bash
+        env:
+          HISTORICAL_SHA256: ${{ steps.historical.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          expo_fp=$(keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android | sed -n 's/^[[:space:]]*SHA256: //p' | head -n1 | tr -d ':')
+          test -n "$expo_fp"
+          echo "EXPO_DEBUG_SHA256=$expo_fp"
+          if [ "$expo_fp" = "$HISTORICAL_SHA256" ]; then
+            echo 'RECOVERABLE_MATCH: Expo prebuild recreates the historical Play upload signer.'
+          else
+            echo 'NO_MATCH: historical signer is not the Expo template debug keystore.'
+            exit 2
+          fi
+
+      - name: Remove downloaded bundle and generated keystore
+        if: always()
+        shell: bash
+        run: |
+          rm -rf historical android
