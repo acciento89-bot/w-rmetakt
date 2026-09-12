@@ -8,6 +8,7 @@ on:
       - "eas.json"
       - "src/**"
       - "assets/**"
+      - "store/google-play/**"
       - "package*.json"
       - ".github/workflows/android-release.yml"
   push:
@@ -18,6 +19,7 @@ on:
       - "eas.json"
       - "src/**"
       - "assets/**"
+      - "store/google-play/**"
       - "package*.json"
       - ".github/workflows/android-release.yml"
   workflow_dispatch:
@@ -28,6 +30,7 @@ permissions:
 jobs:
   android:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -40,16 +43,71 @@ jobs:
           java-version: "17"
       - run: npm ci
       - run: npm run typecheck
-      - name: Validate Play identity and launch icon
+      - name: Validate Play identity and launch icon configuration
         run: |
-          node -e "const a=require('./app.json').expo; if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==3||a.version!=='1.0.1') process.exit(1); if(a.icon!==a.splash?.image) throw new Error('WärmeTakt splash image must match expo.icon')"
+          set -euo pipefail
+          node - <<'NODE'
+          const a=require('./app.json').expo;
+          if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==4||a.version!=='1.0.2') process.exit(1);
+          if(a.icon!==a.splash?.image) throw new Error('WärmeTakt splash image must match expo.icon');
+          if(a.android.adaptiveIcon?.backgroundImage) throw new Error('Do not layer the full icon behind the adaptive foreground; this duplicates launcher artwork');
+          if(a.android.adaptiveIcon?.backgroundColor!=='#102A2B') throw new Error('Adaptive background must match canonical icon background');
+          if(a.android.adaptiveIcon?.foregroundImage!=='./assets/android-icon-foreground.png') throw new Error('Unexpected adaptive foreground');
+          NODE
+          cmp -s assets/icon-source.svg store/google-play/icon.svg
           ! grep -R -E -i "webview|loadurl|localhost" App.tsx src
+      - name: Install icon validation tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq librsvg2-bin
+          python3 -m pip install --disable-pip-version-check -q pillow
+      - name: Verify raster launcher and render canonical Play icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/icon-check" play-assets
+          rsvg-convert -w 1024 -h 1024 assets/icon-source.svg -o "$RUNNER_TEMP/icon-check/full.png"
+          rsvg-convert -w 1024 -h 1024 assets/icon-foreground-source.svg -o "$RUNNER_TEMP/icon-check/foreground.png"
+          rsvg-convert -w 512 -h 512 store/google-play/icon.svg -o play-assets/icon-512.png
+          python3 - <<'PY'
+          from PIL import Image, ImageChops
+          checks=[
+              ('assets/icon.png', 'FULL_ICON'),
+              ('assets/android-icon-foreground.png', 'FOREGROUND'),
+          ]
+          rendered={
+              'FULL_ICON':'/tmp/none',
+              'FOREGROUND':'/tmp/none',
+          }
+          import os
+          root=os.environ['RUNNER_TEMP']+'/icon-check'
+          rendered['FULL_ICON']=root+'/full.png'
+          rendered['FOREGROUND']=root+'/foreground.png'
+          for stored,label in checks:
+              with Image.open(stored) as a, Image.open(rendered[label]) as b:
+                  a.load(); b.load()
+                  if a.size != b.size:
+                      raise SystemExit(f'{stored}: size {a.size} != {b.size}')
+                  if ImageChops.difference(a.convert('RGBA'), b.convert('RGBA')).getbbox() is not None:
+                      raise SystemExit(f'{stored}: pixels differ from canonical {label.lower()} source')
+          with Image.open('play-assets/icon-512.png') as im:
+              if im.size != (512,512):
+                  raise SystemExit(f'Play icon has invalid size {im.size}')
+          if os.path.getsize('play-assets/icon-512.png') >= 1024*1024:
+              raise SystemExit('Play icon exceeds 1 MiB')
+          print('WärmeTakt launcher/store identity parity OK')
+          PY
+          sha256sum play-assets/icon-512.png > play-assets/icon-512.png.sha256
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
       - name: Build release AAB
         run: ./android/gradlew -p android bundleRelease
       - uses: actions/upload-artifact@v4
         with:
-          name: waermetakt-android-unsigned-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: waermetakt-1.0.2-4-android-release
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            play-assets/icon-512.png
+            play-assets/icon-512.png.sha256
           if-no-files-found: error
+          retention-days: 30
