@@ -40,9 +40,9 @@ jobs:
           java-version: "17"
       - run: npm ci
       - run: npm run typecheck
-      - name: Validate Play identity
+      - name: Validate Play identity and launch icon
         run: |
-          node -e "const a=require('./app.json').expo; if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==3||a.version!=='1.0.1') process.exit(1)"
+          node -e "const a=require('./app.json').expo; if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==3||a.version!=='1.0.1') process.exit(1); if(a.icon!==a.splash?.image) throw new Error('WärmeTakt splash image must match expo.icon')"
           ! grep -R -E -i "webview|loadurl|localhost" App.tsx src
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
