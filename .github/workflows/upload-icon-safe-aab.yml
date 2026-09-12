@@ -18,7 +18,7 @@ concurrency:
 env:
   PACKAGE_NAME: de.kamilunavo.waermetakt
   EXPECTED_VERSION_CODE: '4'
-  EXPECTED_UPLOAD_SHA1: B11EE210ADCC516825A01EE543B2DA17B81B321A
+  CENTRAL_UPLOAD_SHA1: BCF2337D41E617C03BCAE698C09D1523654BD790
   WIF_PROVIDER: projects/1058001477767/locations/global/workloadIdentityPools/github/providers/github-actions
   GOOGLE_SERVICE_ACCOUNT: navoops@emerald-caster-508318-f2.iam.gserviceaccount.com
 
@@ -29,48 +29,42 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with: {persist-credentials: false}
-      - uses: actions/setup-java@v5
-        with: {distribution: temurin, java-version: '17'}
-      - name: Restore actual upload key and reject debug or mismatched certificates
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 || secrets.ANDROID_UPLOAD_KEYSTORE_B64 || secrets.ANDROID_KEYSTORE_BASE64 || secrets.UPLOAD_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD || secrets.ANDROID_UPLOAD_STORE_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD || secrets.UPLOAD_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS || secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD || secrets.ANDROID_KEY_PASSWORD }}
+      - name: Check central upload-key migration gate
         shell: bash
         run: |
           set -euo pipefail
-          umask 077
-          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
-            echo '::error::The original WaermeTakt Play upload credentials are unavailable. Expected SHA-1 B11EE210ADCC516825A01EE543B2DA17B81B321A. The Expo debug key is NOT the accepted upload key. No build or upload performed.'
-            echo 'Blocked: original Play upload key required; no debug-key fallback and no new key generated.' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
+          state=$(curl -fsSL https://raw.githubusercontent.com/acciento89-bot/maengelfix/main/generated/signing-central/android-upload-key-migration.json)
+          status=$(jq -er --arg p "$PACKAGE_NAME" '.apps[] | select(.package == $p) | .status' <<<"$state")
+          target=$(jq -er '.target_upload_certificate_sha1' <<<"$state")
+          test "$target" = "$CENTRAL_UPLOAD_SHA1"
+          if [ "$status" = 'ACTIVE' ]; then
+            echo 'MIGRATION_READY=true' >> "$GITHUB_ENV"
+          else
+            echo 'MIGRATION_READY=false' >> "$GITHUB_ENV"
+            echo "WaermeTakt central upload-key migration is prepared but Play reset is not marked ACTIVE yet ($status). No build/upload attempted." >> "$GITHUB_STEP_SUMMARY"
           fi
-          mkdir -p "$RUNNER_TEMP/waermetakt-signing"
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/waermetakt-signing/upload.jks"
-          keytool -J-Duser.language=en -list -v -keystore "$RUNNER_TEMP/waermetakt-signing/upload.jks" -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" > "$RUNNER_TEMP/waermetakt-signing/certificate.txt"
-          fp=$(sed -n 's/^[[:space:]]*SHA1: //p' "$RUNNER_TEMP/waermetakt-signing/certificate.txt" | tr -d ':\r\n ')
-          test "$fp" = "$EXPECTED_UPLOAD_SHA1" || { echo "::error::Rejected signing certificate $fp; Play expects $EXPECTED_UPLOAD_SHA1. No build or upload performed."; exit 1; }
-          python3 - <<'PYENV'
-          import os
-          fields = {'ANDROID_UPLOAD_KEYSTORE_PATH': os.environ['RUNNER_TEMP'] + '/waermetakt-signing/upload.jks',
-                    'ANDROID_UPLOAD_KEYSTORE_PASSWORD': os.environ['STORE_PASSWORD'],
-                    'ANDROID_UPLOAD_KEY_ALIAS': os.environ['KEY_ALIAS'],
-                    'ANDROID_UPLOAD_KEY_PASSWORD': os.environ['KEY_PASSWORD']}
-          for value in fields.values():
-              if not value or '\n' in value or '\r' in value:
-                  raise SystemExit('Invalid signing credential format')
-          with open(os.environ['GITHUB_ENV'], 'a') as out:
-              for name, value in fields.items():
-                  out.write(f'{name}={value}\n')
-          PYENV
-          echo "Verified Play upload certificate SHA-1: $fp"
+      - uses: actions/setup-java@v5
+        if: env.MIGRATION_READY == 'true'
+        with: {distribution: temurin, java-version: '17'}
+      - name: Restore central Kamilunavo upload identity
+        if: env.MIGRATION_READY == 'true'
+        uses: acciento89-bot/maengelfix/.github/actions/restore-central-android-signing@main
+      - name: Reject any signing identity except the central key
+        if: env.MIGRATION_READY == 'true'
+        shell: bash
+        run: test "$KAMILUNAVO_CENTRAL_UPLOAD_SHA1" = "$CENTRAL_UPLOAD_SHA1"
       - uses: actions/setup-node@v5
+        if: env.MIGRATION_READY == 'true'
         with: {node-version: '22', cache: npm}
       - uses: android-actions/setup-android@v3
+        if: env.MIGRATION_READY == 'true'
       - uses: gradle/actions/setup-gradle@v4
-      - run: npm ci --no-audit --no-fund
+        if: env.MIGRATION_READY == 'true'
+      - name: Install dependencies
+        if: env.MIGRATION_READY == 'true'
+        run: npm ci --no-audit --no-fund
       - name: Verify icon identity
+        if: env.MIGRATION_READY == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -81,49 +75,51 @@ jobs:
           if(a.android?.adaptiveIcon?.backgroundImage) throw new Error('Adaptive launcher must not compose a second full icon');
           NODE
           cmp -s assets/icon-source.svg store/google-play/icon.svg
-      - name: Generate and build native release without template signing
+      - name: Generate unsigned native release
+        if: env.MIGRATION_READY == 'true'
         shell: bash
         run: |
           set -euo pipefail
           rm -rf android
           npx expo prebuild --platform android --no-install
-          python3 - <<'PYGRADLE'
+          python3 - <<'PY'
           from pathlib import Path
           p = Path('android/app/build.gradle')
           text = p.read_text()
           if 'signingConfig signingConfigs.debug' not in text:
               raise SystemExit('Unexpected generated signing configuration; stop rather than guess')
-          p.write_text(text.replace('signingConfig signingConfigs.debug', '// Explicit Play signing follows bundleRelease'))
-          PYGRADLE
+          p.write_text(text.replace('signingConfig signingConfigs.debug', '// Central Play signing follows bundleRelease'))
+          PY
           sdkmanager 'platforms;android-36' 'build-tools;36.0.0' >/dev/null
           ./android/gradlew -p android bundleRelease
           test -s android/app/build/outputs/bundle/release/app-release.aab
-      - name: Sign release bundle with the verified original upload certificate
+      - name: Sign release with central upload identity and verify signer
+        if: env.MIGRATION_READY == 'true'
         shell: bash
         run: |
           set -euo pipefail
           AAB='android/app/build/outputs/bundle/release/app-release.aab'
           jarsigner -keystore "$ANDROID_UPLOAD_KEYSTORE_PATH" -storepass:env ANDROID_UPLOAD_KEYSTORE_PASSWORD -keypass:env ANDROID_UPLOAD_KEY_PASSWORD "$AAB" "$ANDROID_UPLOAD_KEY_ALIAS"
-          jarsigner -verify "$AAB" > "$RUNNER_TEMP/waermetakt-signing/bundle-verification.txt"
-          grep -Fq 'jar verified.' "$RUNNER_TEMP/waermetakt-signing/bundle-verification.txt"
-          keytool -J-Duser.language=en -printcert -jarfile "$AAB" > "$RUNNER_TEMP/waermetakt-signing/bundle-certificate.txt"
-          fp=$(sed -n 's/^[[:space:]]*SHA1: //p' "$RUNNER_TEMP/waermetakt-signing/bundle-certificate.txt" | tr -d ':\r\n ')
-          test "$fp" = "$EXPECTED_UPLOAD_SHA1"
+          jarsigner -verify "$AAB" | grep -Fq 'jar verified.'
+          keytool -J-Duser.language=en -printcert -jarfile "$AAB" > "$RUNNER_TEMP/bundle-cert.txt"
+          actual=$(sed -n 's/^[[:space:]]*SHA1: //p' "$RUNNER_TEMP/bundle-cert.txt" | tr -d ':\r\n ')
+          test "$actual" = "$CENTRAL_UPLOAD_SHA1"
           echo "AAB_PATH=$AAB" >> "$GITHUB_ENV"
       - id: google-auth
+        if: env.MIGRATION_READY == 'true'
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
           service_account: ${{ env.GOOGLE_SERVICE_ACCOUNT }}
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/androidpublisher
-      - name: Upload and read back the exact Play bundle
+      - name: Upload and independently verify exact Play bundle
+        if: env.MIGRATION_READY == 'true'
         env: {TOKEN: '${{ steps.google-auth.outputs.access_token }}'}
         shell: bash
         run: |
           set -euo pipefail
-          api='https://androidpublisher.googleapis.com/androidpublisher/v3'
-          upload='https://androidpublisher.googleapis.com/upload/androidpublisher/v3'
+          api='https://androidpublisher.googleapis.com/androidpublisher/v3'; upload='https://androidpublisher.googleapis.com/upload/androidpublisher/v3'
           edit=''; body=$(mktemp)
           cleanup() { if [ -n "$edit" ]; then curl -sS --max-time 30 -X DELETE -H "Authorization: Bearer $TOKEN" "$api/applications/$PACKAGE_NAME/edits/$edit" >/dev/null || true; fi; rm -f "$body"; }
           trap cleanup EXIT
@@ -139,19 +135,16 @@ jobs:
           local_sha=$(sha256sum "$AAB_PATH" | cut -d' ' -f1)
           remote_sha=$(jq -er '.sha256' "$body" | tr '[:upper:]' '[:lower:]')
           test "$remote_sha" = "$local_sha"
-          status=$(curl -sS --max-time 120 -o "$body" -w '%{http_code}' -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{}' "$api/applications/$PACKAGE_NAME/edits/$edit:commit")
-          if [[ "$status" != 2* ]] && grep -Fq 'changesNotSentForReview' "$body"; then
-            status=$(curl -sS --max-time 120 -o "$body" -w '%{http_code}' -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{}' "$api/applications/$PACKAGE_NAME/edits/$edit:commit?changesNotSentForReview=true")
-            echo 'Play requires a separate review submission; upload does not change a release track.' >> "$GITHUB_STEP_SUMMARY"
-          fi
+          status=$(curl -sS --max-time 120 -o "$body" -w '%{http_code}' -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{}' "$api/applications/$PACKAGE_NAME/edits/$edit:commit?changesNotSentForReview=true")
           [[ "$status" == 2* ]] || { cat "$body" >&2; exit 1; }
           edit=''
           edit=$(curl -fsS --max-time 60 -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{}' "$api/applications/$PACKAGE_NAME/edits" | jq -er '.id')
           curl -fsS --max-time 60 -H "Authorization: Bearer $TOKEN" "$api/applications/$PACKAGE_NAME/edits/$edit/bundles" > "$body"
           jq -e --argjson code "$EXPECTED_VERSION_CODE" --arg sha "$local_sha" '[.bundles[]? | select(.versionCode == $code and (.sha256 | ascii_downcase) == $sha)] | length == 1' "$body" >/dev/null
-          echo "WaermeTakt version $EXPECTED_VERSION_CODE uploaded and independently verified, SHA-256 $local_sha. Release tracks unchanged." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "WaermeTakt version $EXPECTED_VERSION_CODE uploaded with central Kamilunavo identity and independently verified, SHA-256 $local_sha." | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Remove temporary signing material and generated native project
         if: always()
         shell: bash
         run: |
-          rm -rf "$RUNNER_TEMP/waermetakt-signing" android
+          rm -rf "$RUNNER_TEMP/kamilunavo-central-signing" "$RUNNER_TEMP/kamilunavo-central-upload.p12" android
+          rm -f "$RUNNER_TEMP/bundle-cert.txt"
