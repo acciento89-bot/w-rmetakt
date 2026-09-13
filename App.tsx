@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Linking, NativeModules, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Linking, NativeModules, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { database, Experiment, Measurement, SystemProfile } from './src/database';
 import { analyzeMeasurements, InsightKey } from './src/domain';
 import { flowStrings, Language, strings, unitStrings } from './src/i18n';
@@ -145,7 +146,7 @@ export default function App() {
   const saveExperiment = async (experiment: Experiment) => { await database.saveExperiment(experiment); setExperiments(await database.listExperiments()); setScreen('tests'); };
   const saveProfile = async (next: SystemProfile) => { await database.saveProfile(next); setProfile(next); };
 
-  return <SafeAreaView style={styles.safe}><StatusBar style="light" /><View style={styles.app}>
+  return <SafeAreaProvider><SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}><StatusBar style="light" /><View style={styles.app}>
     <Header language={language} isPro={purchase.isPro} t={t} onStatus={() => setScreen('settings')} />
     <View style={styles.content}>
       {screen === 'home' && <Dashboard t={t} analysis={analysis} ready={isReady} unitSystem={unitSystem} experiment={experiments[0]} latest={measurements[0]} profile={profile} onNew={() => setScreen('entry')} onNewTest={startTest} onAnalysis={() => setScreen('tests')} />}
@@ -157,7 +158,7 @@ export default function App() {
       {screen === 'pro' && <ProReview t={t} language={language} />}
     </View>
     <Navigation screen={screen} setScreen={setScreen} t={t} />
-  </View></SafeAreaView>;
+  </View></SafeAreaView></SafeAreaProvider>;
 }
 
 function Header({ language, isPro, t, onStatus }: { language: Language; isPro: boolean; t: any; onStatus: () => void }) {
@@ -292,7 +293,7 @@ function Navigation({ screen, setScreen, t }: { screen: Screen; setScreen: (s: S
     { key: 'entry', icon: '＋', label: t.entry }, { key: 'history', icon: '▥', label: t.history },
     { key: 'settings', icon: '⚙', label: t.settings },
   ];
-  return <View style={styles.nav}>{items.map((item) => <Pressable key={item.key} style={styles.navItem} onPress={() => setScreen(item.key)}><Text style={[styles.navIcon, screen === item.key && styles.navActive]}>{item.icon}</Text><Text style={[styles.navLabel, screen === item.key && styles.navActive]}>{item.label}</Text></Pressable>)}</View>;
+  return <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.nav}>{items.map((item) => <Pressable key={item.key} style={styles.navItem} onPress={() => setScreen(item.key)}><Text style={[styles.navIcon, screen === item.key && styles.navActive]}>{item.icon}</Text><Text style={[styles.navLabel, screen === item.key && styles.navActive]}>{item.label}</Text></Pressable>)}</SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
