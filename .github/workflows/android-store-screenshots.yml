@@ -47,6 +47,10 @@ jobs:
           sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
           npx expo prebuild --platform android --no-install
           ./android/gradlew -p android assembleDebug
+      - name: Enable KVM acceleration
+        run: |
+          test -c /dev/kvm
+          sudo chmod 666 /dev/kvm
       - name: Capture real Expo UI
         uses: reactivecircus/android-emulator-runner@v2
         with:
