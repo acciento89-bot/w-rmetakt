@@ -25,11 +25,6 @@
     "android": {
       "package": "de.kamilunavo.waermetakt",
       "versionCode": 4,
-      "adaptiveIcon": {
-        "backgroundColor": "#102A2B",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
       "predictiveBackGestureEnabled": false
     },
     "web": {

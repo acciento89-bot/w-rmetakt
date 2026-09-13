@@ -72,8 +72,11 @@ jobs:
           const a=require('./app.json').expo;
           if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==4) process.exit(1);
           if(a.icon!==a.splash?.image) throw new Error('Splash must match app icon');
-          if(a.android?.adaptiveIcon?.backgroundImage) throw new Error('Adaptive launcher must not compose a second full icon');
+          if(a.android?.adaptiveIcon!==undefined) throw new Error('Adaptive launcher variants must remain disabled');
           NODE
+          test ! -e assets/android-icon-foreground.png
+          test ! -e assets/android-icon-background.png
+          test ! -e assets/android-icon-monochrome.png
           cmp -s assets/icon-source.svg store/google-play/icon.svg
       - name: Generate unsigned native release
         if: env.MIGRATION_READY == 'true'

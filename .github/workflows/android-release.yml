@@ -50,10 +50,13 @@ jobs:
           const a=require('./app.json').expo;
           if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==4||a.version!=='1.0.2') process.exit(1);
           if(a.icon!==a.splash?.image) throw new Error('WärmeTakt splash image must match expo.icon');
-          if(a.android.adaptiveIcon?.backgroundImage) throw new Error('Do not layer the full icon behind the adaptive foreground; this duplicates launcher artwork');
-          if(a.android.adaptiveIcon?.backgroundColor!=='#102A2B') throw new Error('Adaptive background must match canonical icon background');
-          if(a.android.adaptiveIcon?.foregroundImage!=='./assets/android-icon-foreground.png') throw new Error('Unexpected adaptive foreground');
+          if(a.android.adaptiveIcon!==undefined) throw new Error('Adaptive launcher variants must remain disabled');
           NODE
+          test ! -e assets/android-icon-foreground.png
+          test ! -e assets/android-icon-background.png
+          test ! -e assets/android-icon-monochrome.png
+          test ! -e assets/icon-foreground-source.svg
+          test ! -e assets/icon-monochrome-source.svg
           cmp -s assets/icon-source.svg store/google-play/icon.svg
           ! grep -R -E -i "webview|loadurl|localhost" App.tsx src
       - name: Install icon validation tools
@@ -67,22 +70,18 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/icon-check" play-assets
           rsvg-convert -w 1024 -h 1024 assets/icon-source.svg -o "$RUNNER_TEMP/icon-check/full.png"
-          rsvg-convert -w 1024 -h 1024 assets/icon-foreground-source.svg -o "$RUNNER_TEMP/icon-check/foreground.png"
           rsvg-convert -w 512 -h 512 store/google-play/icon.svg -o play-assets/icon-512.png
           python3 - <<'PY'
           from PIL import Image, ImageChops
           checks=[
               ('assets/icon.png', 'FULL_ICON'),
-              ('assets/android-icon-foreground.png', 'FOREGROUND'),
           ]
           rendered={
               'FULL_ICON':'/tmp/none',
-              'FOREGROUND':'/tmp/none',
           }
           import os
           root=os.environ['RUNNER_TEMP']+'/icon-check'
           rendered['FULL_ICON']=root+'/full.png'
-          rendered['FOREGROUND']=root+'/foreground.png'
           for stored,label in checks:
               with Image.open(stored) as a, Image.open(rendered[label]) as b:
                   a.load(); b.load()
