@@ -46,7 +46,7 @@ jobs:
         run: |
           sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
           npx expo prebuild --platform android --no-install
-          ./android/gradlew -p android assembleDebug
+          ./android/gradlew -p android assembleRelease
       - name: Enable KVM acceleration
         run: |
           test -c /dev/kvm
@@ -59,7 +59,7 @@ jobs:
           profile: pixel_7
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          script: PACKAGE_NAME='de.kamilunavo.waermetakt' APK_PATH='android/app/build/outputs/apk/debug/app-debug.apk' OUTPUT_DIR='store/google-play/screenshots/de-DE' SECOND_ACTION='swipe' bash "$GITHUB_WORKSPACE/.github/scripts/capture-android-store-screenshots.sh"
+          script: PACKAGE_NAME='de.kamilunavo.waermetakt' APK_PATH='android/app/build/outputs/apk/release/app-release.apk' OUTPUT_DIR='store/google-play/screenshots/de-DE' SECOND_ACTION='swipe' bash "$GITHUB_WORKSPACE/.github/scripts/capture-android-store-screenshots.sh"
       - uses: actions/upload-artifact@v4
         with:
           name: WaermeTakt-authentic-Android-store-screenshots
