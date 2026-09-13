@@ -10,7 +10,16 @@ readonly apk_path="$GITHUB_WORKSPACE/$APK_PATH"
 readonly output_dir="$GITHUB_WORKSPACE/$OUTPUT_DIR"
 
 current_focus() {
-  adb shell dumpsys window | grep -E "mCurrentFocus|mFocusedApp" || true
+  local dump
+  local line
+  dump="$(adb shell dumpsys window windows)"
+  while IFS= read -r line; do
+    if [[ "$line" == *"mCurrentFocus="* ]]; then
+      printf '%s\n' "$line"
+      return 0
+    fi
+  done <<< "$dump"
+  return 0
 }
 
 wait_for_foreground() {
@@ -30,16 +39,16 @@ wait_for_foreground() {
 
 launch_app() {
   adb shell am force-stop "$PACKAGE_NAME"
-  adb shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1
+  adb shell am start -W -n "$PACKAGE_NAME/.MainActivity"
   wait_for_foreground
-  sleep 10
+  sleep 5
 }
 
 assert_clean_foreground() {
   local focus
   focus="$(current_focus)"
   if [[ "$focus" != *"$PACKAGE_NAME"* ]]; then
-    echo "Expected $PACKAGE_NAME in the foreground; refusing to capture." >&2
+    echo "Expected $PACKAGE_NAME in mCurrentFocus; refusing to capture." >&2
     printf '%s\n' "$focus" >&2
     return 1
   fi
@@ -49,6 +58,7 @@ mkdir -p "$output_dir"
 rm -f "$output_dir"/*.png
 test -s "$apk_path"
 adb install -r "$apk_path"
+adb shell settings put global hide_error_dialogs 1
 adb shell settings put system accelerometer_rotation 0
 adb shell settings put system user_rotation 0
 adb shell cmd locale set-app-locales "$PACKAGE_NAME" --user 0 de-DE || true
