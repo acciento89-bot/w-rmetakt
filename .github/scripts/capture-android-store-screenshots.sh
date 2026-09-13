@@ -30,6 +30,10 @@ wait_for_foreground() {
     if [[ "$focus" == *"$PACKAGE_NAME"* ]]; then
       return 0
     fi
+    if [[ "$focus" == *"Application Not Responding: com.android.launcher3"* ]]; then
+      adb shell am force-stop com.android.launcher3
+      adb shell am start -W -n "$PACKAGE_NAME/.MainActivity"
+    fi
     sleep 1
   done
   echo "Timed out waiting for $PACKAGE_NAME to become the foreground app." >&2
