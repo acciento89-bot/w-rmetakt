@@ -1,4 +1,4 @@
-import { Measurement } from './database';
+import type { Measurement } from './database';
 
 const average = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 const rounded = (value: number, digits = 1) => Number(value.toFixed(digits));
