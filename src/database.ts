@@ -1,4 +1,6 @@
 import * as SQLite from 'expo-sqlite';
+import { loadQualityReview, saveQualityReview } from './qualityRepository';
+import type { QualityReview } from './experimentQuality';
 
 export type Measurement = {
   id: string;
@@ -132,6 +134,14 @@ export const database = {
       `INSERT OR REPLACE INTO experiments (id, setting, previous_value, new_value, unit, duration_days, started_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       item.id, item.setting, item.previousValue, item.newValue, item.unit, item.durationDays, item.startedAt, item.status,
     );
+  },
+
+  async loadQualityReview(experimentId: string) {
+    return loadQualityReview(await db(), experimentId);
+  },
+
+  async saveQualityReview(review: QualityReview) {
+    await saveQualityReview(await db(), review);
   },
 
   async getProfile(): Promise<SystemProfile> {

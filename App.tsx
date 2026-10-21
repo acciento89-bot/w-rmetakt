@@ -1,13 +1,14 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Linking, NativeModules, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { BackHandler, KeyboardAvoidingView, Linking, NativeModules, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { database, Experiment, Measurement, SystemProfile } from './src/database';
 import { analyzeMeasurements, InsightKey } from './src/domain';
-import { flowStrings, Language, strings, unitStrings } from './src/i18n';
+import { flowStrings, Language, qualityStrings, strings, unitStrings } from './src/i18n';
 import { useProPurchase } from './src/useProPurchase';
+import { QualityReviewScreen } from './src/QualityReviewScreen';
 
-type Screen = 'home' | 'tests' | 'newTest' | 'entry' | 'history' | 'settings' | 'pro';
+type Screen = 'home' | 'tests' | 'newTest' | 'entry' | 'history' | 'settings' | 'pro' | 'quality';
 type UnitSystem = 'metric' | 'imperial';
 
 const screenshotMode = process.env.EXPO_PUBLIC_SCREENSHOT_MODE === '1';
@@ -97,6 +98,14 @@ const extra = {
 } as const;
 
 export default function App() {
+  return <SafeAreaProvider><AppContent /></SafeAreaProvider>;
+}
+
+function AppContent() {
+  const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
+  const [headerHeight, setHeaderHeight] = useState(76);
+  const [reviewExperimentId, setReviewExperimentId] = useState<string | null>(null);
   const [screen, setScreen] = useState<Screen>(() => screenshotMode && screenshotRoute ? screenshotRoute : 'home');
   const [language, setLanguage] = useState<Language>(() => screenshotMode && screenshotLanguage ? screenshotLanguage : Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase().startsWith('de') ? 'de' : 'en');
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => screenshotMode && screenshotLanguage ? (screenshotLanguage === 'en' ? 'imperial' : 'metric') : Intl.DateTimeFormat().resolvedOptions().locale.toUpperCase().includes('-US') ? 'imperial' : 'metric');
@@ -105,7 +114,7 @@ export default function App() {
   const [profile, setProfile] = useState<SystemProfile>({ manufacturer: '', model: '', buildingArea: '', constructionYear: '', heatDistribution: 'floor', electricityPrice: '0.32' });
   const [isReady, setIsReady] = useState(false);
   const purchase = useProPurchase();
-  const t = { ...strings[language], ...unitStrings[language], ...flowStrings[language], ...extra[language] };
+  const t = { ...strings[language], ...unitStrings[language], ...flowStrings[language], ...extra[language], qualityOpen: qualityStrings[language].open };
 
   useEffect(() => {
     database.initialize().then(async () => {
@@ -140,17 +149,26 @@ export default function App() {
     return () => subscription.remove();
   }, []);
 
+  useEffect(() => {
+    if (screen !== 'quality') return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { setScreen('tests'); return true; });
+    return () => subscription.remove();
+  }, [screen]);
+
+  const reviewExperiment = experiments.find((item) => item.id === reviewExperimentId);
+  const openReview = (experiment: Experiment) => { setReviewExperimentId(experiment.id); setScreen('quality'); };
   const analysis = useMemo(() => analyzeMeasurements(measurements), [measurements]);
   const saveMeasurement = async (measurement: Measurement) => { await database.saveMeasurement(measurement); setMeasurements(await database.listMeasurements()); setScreen('home'); };
   const startTest = () => setScreen(!purchase.isPro && experiments.length >= 1 ? 'settings' : 'newTest');
   const saveExperiment = async (experiment: Experiment) => { await database.saveExperiment(experiment); setExperiments(await database.listExperiments()); setScreen('tests'); };
   const saveProfile = async (next: SystemProfile) => { await database.saveProfile(next); setProfile(next); };
 
-  return <SafeAreaProvider><SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}><StatusBar style="light" /><View style={styles.app}>
-    <Header language={language} isPro={purchase.isPro} t={t} onStatus={() => setScreen('settings')} />
+  return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}><StatusBar style="light" /><View style={[styles.app, { width: Math.max(0, Math.min(960, window.width - insets.left - insets.right)), alignSelf: 'center' }]}>
+    <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}><Header language={language} isPro={purchase.isPro} t={t} onStatus={() => setScreen('settings')} /></View>
     <View style={styles.content}>
       {screen === 'home' && <Dashboard t={t} analysis={analysis} ready={isReady} unitSystem={unitSystem} experiment={experiments[0]} latest={measurements[0]} profile={profile} onNew={() => setScreen('entry')} onNewTest={startTest} onAnalysis={() => setScreen('tests')} />}
-      {screen === 'tests' && <Analysis t={t} analysis={analysis} experiments={experiments} onNew={startTest} />}
+      {screen === 'tests' && <Analysis t={t} analysis={analysis} experiments={experiments} onNew={startTest} onReview={openReview} />}
+      {screen === 'quality' && reviewExperiment && <QualityReviewScreen key={reviewExperiment.id} experiment={reviewExperiment} measurements={measurements} language={language} unitSystem={unitSystem} keyboardOffset={insets.top + headerHeight} onBack={() => setScreen('tests')} />}
       {screen === 'newTest' && <NewTest t={t} onSave={saveExperiment} onCancel={() => setScreen('tests')} />}
       {screen === 'entry' && <Entry t={t} language={language} unitSystem={unitSystem} onSave={saveMeasurement} />}
       {screen === 'history' && <History t={t} language={language} unitSystem={unitSystem} measurements={measurements} analysis={analysis} />}
@@ -158,7 +176,7 @@ export default function App() {
       {screen === 'pro' && <ProReview t={t} language={language} />}
     </View>
     <Navigation screen={screen} setScreen={setScreen} t={t} />
-  </View></SafeAreaView></SafeAreaProvider>;
+  </View></SafeAreaView>;
 }
 
 function Header({ language, isPro, t, onStatus }: { language: Language; isPro: boolean; t: any; onStatus: () => void }) {
@@ -202,12 +220,12 @@ function ExperimentCard({ t, experiment, change }: { t: any; experiment: Experim
   return <View style={styles.testCard}><View style={styles.testIcon}><Text style={styles.testIconText}>↘</Text></View><View style={styles.testContent}><View style={styles.cardTop}><Text style={styles.testTitle}>{t.settingNames[experiment.setting] ?? experiment.setting}</Text><Text style={styles.badge}>{experiment.status === 'active' ? t.inProgress : t.completed}</Text></View><Text style={styles.testMeta}>{experiment.previousValue} → {experiment.newValue} {experiment.unit} · {elapsed}/{experiment.durationDays} {t.days}</Text><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View><Text style={styles.testHint}>{change ? `${change > 0 ? '+' : ''}${change}% · ${t.weatherAdjusted}` : t.weatherAdjusted}</Text></View></View>;
 }
 
-function Analysis({ t, analysis, experiments, onNew }: any) {
+function Analysis({ t, analysis, experiments, onNew, onReview }: any) {
   return <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}><Text style={styles.eyebrow}>{t.analysis}</Text><Text style={styles.title}>{t.recommendations}</Text><Text style={styles.subtitle}>{t.recommendationsIntro}</Text>
     <View style={styles.techGrid}><TechMetric value={analysis.deltaT ? `${analysis.deltaT} K` : '–'} label={t.flowSpread} /><TechMetric value={analysis.runtimePerStart ? `${analysis.runtimePerStart} min` : '–'} label={t.runtimeStart} /><TechMetric value={analysis.avgFlow ? `${analysis.avgFlow} °C` : '–'} label={t.flowTemp} /></View>
     {analysis.insights.map((key: InsightKey, index: number) => <View key={key} style={[styles.insightCard, index === 0 && styles.insightCardLead]}><View style={[styles.insightIcon, index === 0 && styles.insightIconLead]}><Text style={styles.insightIconText}>{key === 'collectData' ? 'i' : key.includes('Risk') || key === 'lowCop' ? '!' : '✓'}</Text></View><View style={styles.insightContent}><Text style={styles.insightTitle}>{t.insightTitles[key]}</Text><Text style={styles.insightText}>{t.insightTexts[key]}</Text></View></View>)}
     <SectionTitle title={t.testsAndChanges} />
-    {experiments.length ? experiments.map((experiment: Experiment) => <ExperimentCard key={experiment.id} t={t} experiment={experiment} change={analysis.change} />) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>{t.noTests}</Text><Text style={styles.emptyText}>{t.noTestsText}</Text></View>}
+    {experiments.length ? experiments.map((experiment: Experiment) => <View key={experiment.id}><ExperimentCard t={t} experiment={experiment} change={analysis.change} /><Pressable accessibilityRole="button" testID={`quality-open-${experiment.id}`} style={styles.reviewButton} onPress={() => onReview(experiment)}><Text style={styles.reviewButtonText}>{t.qualityOpen}</Text></Pressable></View>) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>{t.noTests}</Text><Text style={styles.emptyText}>{t.noTestsText}</Text></View>}
     <Pressable style={styles.primaryButton} onPress={onNew}><Text style={styles.primaryButtonText}>＋  {t.newTest}</Text></Pressable>
   </ScrollView>;
 }
@@ -288,17 +306,18 @@ function Segment<T extends string | number>({ options, value, onChange }: { opti
 function SummaryRow({ label, value }: { label: string; value: string }) { return <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{label}</Text><Text style={styles.summaryValue}>{value}</Text></View>; }
 
 function Navigation({ screen, setScreen, t }: { screen: Screen; setScreen: (s: Screen) => void; t: any }) {
+  const insets = useSafeAreaInsets();
   const items: Array<{ key: Screen; icon: string; label: string }> = [
     { key: 'home', icon: '⌂', label: t.home }, { key: 'tests', icon: '◉', label: t.analysis },
     { key: 'entry', icon: '＋', label: t.entry }, { key: 'history', icon: '▥', label: t.history },
     { key: 'settings', icon: '⚙', label: t.settings },
   ];
-  return <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.nav}>{items.map((item) => <Pressable key={item.key} style={styles.navItem} onPress={() => setScreen(item.key)}><Text style={[styles.navIcon, screen === item.key && styles.navActive]}>{item.icon}</Text><Text style={[styles.navLabel, screen === item.key && styles.navActive]}>{item.label}</Text></Pressable>)}</SafeAreaView>;
+  return <View style={[styles.nav, { minHeight: 72 + insets.bottom, paddingBottom: 5 + insets.bottom }]}>{items.map((item) => <Pressable key={item.key} style={styles.navItem} onPress={() => setScreen(item.key)}><Text style={[styles.navIcon, screen === item.key && styles.navActive]}>{item.icon}</Text><Text style={[styles.navLabel, screen === item.key && styles.navActive]}>{item.label}</Text></Pressable>)}</View>;
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 }, safe: { flex: 1, backgroundColor: colors.night }, app: { flex: 1, backgroundColor: colors.cream }, content: { flex: 1 },
-  header: { height: 76, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.night, borderBottomWidth: 1, borderBottomColor: colors.forest },
+  header: { minHeight: 76, paddingVertical: 12, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.night, borderBottomWidth: 1, borderBottomColor: colors.forest },
   brand: { color: colors.white, fontSize: 24, fontWeight: '800', letterSpacing: -0.8 }, brandLine: { color: colors.lime, fontSize: 9, fontWeight: '800', letterSpacing: 2.2, marginTop: 1 },
   statusPill: { backgroundColor: colors.forest, borderRadius: 18, borderWidth: 1, borderColor: '#2A5B50', paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 7 },
   statusPillPro: { backgroundColor: colors.lime, borderColor: colors.lime }, statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.sage }, statusDotPro: { backgroundColor: colors.night }, statusText: { color: colors.mist, fontWeight: '800', fontSize: 10, letterSpacing: 0.8 }, statusTextPro: { color: colors.night },
@@ -331,5 +350,6 @@ const styles = StyleSheet.create({
   wizardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }, stepLabel: { color: colors.muted, fontSize: 11, fontWeight: '800' }, optionCard: { minHeight: 55, borderRadius: 15, borderWidth: 1, borderColor: colors.sage, backgroundColor: colors.surface, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', marginBottom: 9 }, optionActive: { borderColor: colors.teal, backgroundColor: colors.mist }, optionText: { color: colors.ink, fontSize: 13, fontWeight: '800', flex: 1 }, optionTextActive: { color: colors.pine }, radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.teal, marginRight: 11 }, radioActive: { borderWidth: 5, borderColor: colors.teal },
   infoCard: { backgroundColor: colors.mist, borderRadius: 15, padding: 14, marginTop: 12, borderWidth: 1, borderColor: colors.sage }, infoTitle: { color: colors.pine, fontSize: 12, fontWeight: '900' }, infoText: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 5 }, summaryCard: { backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.sage, paddingHorizontal: 16 }, summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.line }, summaryLabel: { color: colors.muted, fontSize: 11 }, summaryValue: { color: colors.ink, fontSize: 12, fontWeight: '900', maxWidth: '62%', textAlign: 'right' },
   confirmCard: { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.sage, padding: 14, flexDirection: 'row', alignItems: 'flex-start', marginTop: 13 }, confirmActive: { borderColor: colors.teal, backgroundColor: colors.mist }, checkbox: { width: 21, height: 21, borderRadius: 6, borderWidth: 2, borderColor: colors.teal, marginRight: 10, alignItems: 'center', justifyContent: 'center' }, checkboxActive: { backgroundColor: colors.teal }, checkmark: { color: colors.white, fontWeight: '900' }, confirmText: { color: colors.ink, fontSize: 11, lineHeight: 17, flex: 1 }, wizardActions: { flexDirection: 'row', gap: 9, marginTop: 1 }, wizardPrimary: { flex: 1 }, secondaryButton: { flex: 0.65, minHeight: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 17, borderWidth: 1, borderColor: colors.teal, backgroundColor: colors.pale }, secondaryButtonText: { color: colors.teal, fontSize: 13, fontWeight: '900' }, disabledButton: { opacity: 0.5 },
-  nav: { height: 72, paddingBottom: 5, flexDirection: 'row', backgroundColor: colors.night, borderTopWidth: 1, borderTopColor: colors.forest }, navItem: { flex: 1, alignItems: 'center', justifyContent: 'center' }, navIcon: { color: '#78A499', fontSize: 20, height: 25 }, navLabel: { color: '#78A499', fontSize: 8, fontWeight: '800' }, navActive: { color: colors.lime },
+  reviewButton: { minHeight: 48, padding: 14, marginTop: -6, marginBottom: 18, borderWidth: 1, borderColor: colors.teal, borderRadius: 12, justifyContent: 'center' }, reviewButtonText: { fontSize: 15, fontWeight: '700', color: colors.forest, textAlign: 'center' },
+  nav: { flexDirection: 'row', backgroundColor: colors.night, borderTopWidth: 1, borderTopColor: colors.forest }, navItem: { flex: 1, alignItems: 'center', justifyContent: 'center' }, navIcon: { color: '#78A499', fontSize: 20, height: 25 }, navLabel: { color: '#78A499', fontSize: 8, fontWeight: '800' }, navActive: { color: colors.lime },
 });
