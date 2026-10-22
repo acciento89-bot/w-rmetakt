@@ -39,3 +39,13 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Disposable native acceptance host outputs (never source or shipping artifacts)
+.github/waermetakt-native/host/.gradle/
+.github/waermetakt-native/host/build/
+.github/waermetakt-native/host/app/build/
+__pycache__/
+*.pyc
+candidate/
+prepared/
+release/
