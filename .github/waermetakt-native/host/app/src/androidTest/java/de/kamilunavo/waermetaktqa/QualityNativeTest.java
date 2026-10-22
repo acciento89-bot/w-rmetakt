@@ -68,7 +68,20 @@ public final class QualityNativeTest {
   // Use a deliberate finger-length press after the native disabled→enabled transition.
   // Keep the real post-save navigation assertion; never retry a possibly successful save.
   unique(id("experiment-next")).click(200);
-  assertTrue("Start must leave the wizard",device.wait(Until.gone(id("experiment-confirm")),10000));
+  boolean leftWizard=device.wait(Until.gone(id("experiment-confirm")),10000);
+  if(!leftWizard){
+   // Diagnostic only: isolate touch dispatch from the accessible click callback.
+   // This fallback NEVER turns failed physical touch acceptance into a pass.
+   android.view.accessibility.AccessibilityNodeInfo root=InstrumentationRegistry.getInstrumentation().getUiAutomation().getRootInActiveWindow();
+   java.util.ArrayDeque<android.view.accessibility.AccessibilityNodeInfo> pending=new java.util.ArrayDeque<>();if(root!=null)pending.add(root);boolean acted=false;
+   while(!pending.isEmpty()){
+    android.view.accessibility.AccessibilityNodeInfo node=pending.remove();
+    if("experiment-next".equals(node.getViewIdResourceName())){acted=node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);break;}
+    for(int index=0;index<node.getChildCount();index++){android.view.accessibility.AccessibilityNodeInfo child=node.getChild(index);if(child!=null)pending.add(child);}
+   }
+   boolean accessibleNavigation=device.wait(Until.gone(id("experiment-confirm")),10000);
+   fail("Physical start failed; diagnostic accessible action="+acted+", wizard left="+accessibleNavigation);
+  }
   assertNotNull(find(By.res(Pattern.compile("(?:"+Pattern.quote(APP)+":id/)?quality-open-.+"))));capture("01-ordinary-experiment");
   test("nav-entry");test("measurement-save");test("nav-history");assertNotNull(find(By.textContains("5.1")));capture("02-ordinary-measurement");
  }
