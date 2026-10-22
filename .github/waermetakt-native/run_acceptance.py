@@ -1,6 +1,7 @@
 """One owned API35 device, actual Release UI, explicitly declared historical QA fixture."""
 import datetime,hashlib,io,json,os,pathlib,re,shutil,sqlite3,subprocess,tarfile,tempfile
 from fixture_contract import snapshot,seed,validate_seed,validate_final
+from remote_sqlite import presence,install_fixture,REMOTE_FIXTURE
 APP='de.kamilunavo.waermetakt';HOST=APP+'qa'
 FRAMES=['01-ordinary-experiment','02-ordinary-measurement','03-all-selected-golden','04-invalid-date-blocked','05-reasoned-comparison','06-cold-reviewed','07-wide-review','08-original-analysis-retained']
 NATIVE_FILES={n+e for n in FRAMES for e in ['.png','.xml']};OPTIONAL_FILES={'failure-screen.png','failure-screen.xml'}
@@ -22,7 +23,7 @@ def run():
   call(['shell','am','force-stop',APP]);inventory=call(['shell','find','/data/user/0/'+APP,'-maxdepth','5','-type','f','-name','waermetakt.db']).decode().strip().splitlines();assert len(inventory)==1
   path=inventory[0];assert re.fullmatch('/data/user/0/de\\.kamilunavo\\.waermetakt/(?:files/SQLite|databases)/waermetakt\\.db',path),'Unexpected installed SQLite location';(proof/'database-inventory.txt').write_text(path+'\n')
   for suffix in ['','-wal','-shm']:
-   exists=call(['shell','sh','-c',f'test -f {path+suffix} && echo PRESENT || echo ABSENT']).strip()
+   exists=call(presence(path,suffix)).strip()
    if exists==b'PRESENT':
     data=call(['exec-out','cat',path+suffix]);assert len(data)<4_000_000;(proof/f'phase{index}-waermetakt.db{suffix}').write_bytes(data)
   c=sqlite3.connect(proof/f'phase{index}-waermetakt.db');c.execute('PRAGMA query_only=ON');v=snapshot(c);c.close();(proof/f'phase{index}-values.json').write_text(json.dumps(v,ensure_ascii=False,indent=2)+'\n');return path,v
@@ -41,7 +42,7 @@ def run():
   with tempfile.TemporaryDirectory(dir=runtime,prefix='waermetakt-explicit-fixture-')as temp:
    db=pathlib.Path(temp)/'waermetakt.db';src=sqlite3.connect(proof/'phase1-waermetakt.db');dst=sqlite3.connect(db);src.backup(dst);src.close();seed(dst);fixture=snapshot(dst);dst.execute('PRAGMA wal_checkpoint(TRUNCATE)');dst.execute('PRAGMA journal_mode=DELETE');dst.close()
    (proof/'fixture-values.json').write_text(json.dumps(fixture,ensure_ascii=False,indent=2)+'\n');(proof/'fixture-manifest.json').write_text(json.dumps({'workflowOwnedOnly':True,'shippingFixtureFeature':False,'measurementCount':8,'experiment':'qa-quality-golden','ordinaryRecordsPreserved':True})+'\n')
-   owned();remote='/data/local/tmp/waermetakt-quality-owned-fixture.db';call(['push',str(db),remote]);call(['shell','sh','-c',f'cat {remote} > {path} && rm -f {path}-wal {path}-shm {remote}'])
+   owned();remote=REMOTE_FIXTURE;call(['push',str(db),remote]);call(install_fixture(path))
   instrument('reviewHistoricalFixtureWithoutChangingRawReadings',2);_,reviewed=snap(2);validate_final(before,fixture,reviewed)
   instrument('coldReviewAndResponsiveLayout',3);_,cold=snap(3);validate_final(before,fixture,cold);assert reviewed==cold,'Cold reopen changed stored review or original values'
   result.update(status='PASSED',actualStoredEvidence={f'phase{i}-values.json':hashlib.sha256((proof/f'phase{i}-values.json').read_bytes()).hexdigest()for i in range(1,4)})
