@@ -282,7 +282,7 @@ function Settings({ t, language, unitSystem, purchase, profile, onProfile, onLan
     <Pressable style={styles.secondaryGreenButton} onPress={save}><Text style={styles.secondaryGreenText}>{saved ? `✓ ${t.saved}` : t.saveProfile}</Text></Pressable>
     <View style={styles.settingsCard}><Text style={styles.fieldLabel}>{t.language}</Text><Segment options={[{ value: 'de', label: 'Deutsch' }, { value: 'en', label: 'English' }]} value={language} onChange={onLanguage} /><View style={styles.fieldGap} /><Text style={styles.fieldLabel}>{t.unitSystem}</Text><Segment options={[{ value: 'metric', label: t.celsius }, { value: 'imperial', label: t.fahrenheit }]} value={unitSystem} onChange={onUnitSystem} /></View>
     <View style={styles.proCard}><Text style={styles.proCardEyebrow}>WÄRMETAKT PRO</Text><Text style={styles.proCardTitle}>{purchase.isPro ? t.proActive : t.unlockTitle}</Text><Text style={styles.proCardText}>{purchase.isPro ? t.proActiveText : t.unlockText}</Text>{!purchase.isPro && <><Text style={styles.price}>{price} <Text style={styles.once}>{t.once}</Text></Text><Pressable style={[styles.proButton, !purchase.connected && styles.disabledButton]} disabled={!purchase.connected} onPress={() => void purchase.buy()}><Text style={styles.proButtonText}>{purchase.connected ? t.unlock : t.storeConnecting}</Text></Pressable><Pressable onPress={() => void purchase.restore()}><Text style={styles.restore}>{t.restore}</Text></Pressable></>}{purchase.message && <Text style={styles.purchaseError}>{purchase.message === 'NO_PURCHASE_FOUND' ? t.noPurchaseFound : purchase.message}</Text>}</View>
-    <Text style={styles.version}>WärmeTakt 1.0.0 · Kamilunavo</Text>
+    <Text style={styles.version}>WärmeTakt 1.1.0 · Kamilunavo</Text>
   </ScrollView>;
 }
 
