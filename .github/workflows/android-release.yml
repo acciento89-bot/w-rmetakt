@@ -23,19 +23,24 @@ on:
       - "package*.json"
       - ".github/workflows/android-release.yml"
   workflow_dispatch:
+    inputs:
+      build_bundle:
+        description: Build one Android candidate from verified main
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  android:
+  validate:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
       - uses: actions/setup-java@v5
         with:
@@ -43,12 +48,13 @@ jobs:
           java-version: "17"
       - run: npm ci
       - run: npm run typecheck
+      - run: node --test tests/*.test.mjs
       - name: Validate Play identity and launch icon configuration
         run: |
           set -euo pipefail
           node - <<'NODE'
           const a=require('./app.json').expo;
-          if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==4||a.version!=='1.0.2') process.exit(1);
+          if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==5||a.version!=='1.1.0') process.exit(1);
           if(a.icon!==a.splash?.image) throw new Error('WärmeTakt splash image must match expo.icon');
           if(a.android.adaptiveIcon!==undefined) throw new Error('Adaptive launcher variants must remain disabled');
           NODE
@@ -97,16 +103,34 @@ jobs:
           print('WärmeTakt launcher/store identity parity OK')
           PY
           sha256sum play-assets/icon-512.png > play-assets/icon-512.png.sha256
+  bundle:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_bundle && github.ref == 'refs/heads/main' && github.repository == 'acciento89-bot/w-rmetakt'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v5
+        with: {node-version: '24', cache: npm}
+      - uses: actions/setup-java@v5
+        with: {distribution: temurin, java-version: '17'}
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+      - run: npm ci
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
-      - name: Build release AAB
-        run: ./android/gradlew -p android bundleRelease
+      - name: Build one exact Android candidate
+        run: |
+          set -euo pipefail
+          ./android/gradlew -p android --no-daemon --max-workers=1 bundleRelease
+          mkdir candidate
+          cp android/app/build/outputs/bundle/release/app-release.aab candidate/app-release.aab
+          printf '%s\n' "$GITHUB_SHA" > candidate/source-commit.txt
+          (cd candidate && sha256sum app-release.aab > app-release.aab.sha256)
       - uses: actions/upload-artifact@v4
         with:
-          name: waermetakt-1.0.2-4-android-release
-          path: |
-            android/app/build/outputs/bundle/release/app-release.aab
-            play-assets/icon-512.png
-            play-assets/icon-512.png.sha256
+          name: waermetakt-1.1.0-5-android-release
+          path: candidate/
           if-no-files-found: error
           retention-days: 30
