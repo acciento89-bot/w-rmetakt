@@ -21,7 +21,11 @@ export function QualityReviewScreen({ experiment, measurements, language, unitSy
     database.loadQualityReview(experiment.id).then((stored) => {
       const next = stored ?? defaultQualityReview(experiment);
       if (active) setDraft(next);
-    }).catch(() => { if (active) setLoadFailed(true); }).finally(() => { if (active) setLoading(false); });
+    }).catch((error: unknown) => {
+      // Report only the error category/message, never measurements or the stored review.
+      console.warn('QUALITY_REVIEW_LOAD_FAILED', error instanceof Error ? `${error.name}: ${error.message}` : 'Unknown error');
+      if (active) setLoadFailed(true);
+    }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [experiment.id, attempt]);
   const assessment = useMemo(() => {
