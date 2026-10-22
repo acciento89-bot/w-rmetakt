@@ -3,9 +3,9 @@ import datetime,hashlib,io,json,os,pathlib,re,shutil,sqlite3,subprocess,tarfile,
 from fixture_contract import snapshot,seed,validate_seed,validate_final
 from remote_sqlite import presence,install_fixture,REMOTE_FIXTURE
 APP='de.kamilunavo.waermetakt';HOST=APP+'qa'
-FRAMES=['01-ordinary-experiment','02-ordinary-measurement','03-all-selected-golden','04-invalid-date-blocked','05-reasoned-comparison','06-cold-reviewed','07-wide-review','08-original-analysis-retained']
+FRAMES=['01-ordinary-experiment','02-ordinary-measurement','03-all-selected-golden','04-invalid-date-blocked','05-reasoned-comparison','06-cold-reviewed','07-wide-review','08-original-analysis-retained','09-english-review','10-english-comparison']
 NATIVE_FILES={n+e for n in FRAMES for e in ['.png','.xml']};OPTIONAL_FILES={'failure-screen.png','failure-screen.xml'}
-GENERIC_FILES={'result.json','source-commit.txt','build.log','host-build.log','root-mode.txt','installed-identity.txt','database-inventory.txt','preflight-anr.txt','final-anr.txt','window.txt','logcat.txt','final-screen.png','emulator-stop.txt','avd-delete.txt','remaining-avds.txt','remaining-devices.txt','cleanup.json','cleanup-failed.txt','fixture-values.json','fixture-manifest.json'}|{f'phase{i}-{n}'for i in range(1,4)for n in ['values.json','waermetakt.db','waermetakt.db-wal','waermetakt.db-shm','instrumentation.txt']}
+GENERIC_FILES={'result.json','source-commit.txt','build.log','host-build.log','root-mode.txt','installed-identity.txt','database-inventory.txt','preflight-anr.txt','final-anr.txt','window.txt','logcat.txt','final-screen.png','emulator-stop.txt','avd-delete.txt','remaining-avds.txt','remaining-devices.txt','cleanup.json','cleanup-failed.txt','fixture-values.json','fixture-manifest.json'}|{f'phase{i}-{n}'for i in range(1,5)for n in ['values.json','waermetakt.db','waermetakt.db-wal','waermetakt.db-shm','instrumentation.txt']}
 def reject_anr(data):
  if re.search(rb'ANR in|Application Not Responding|com.android.systemui|com.google.android.apps.nexuslauncher',data,re.I):raise RuntimeError('Observed system/launcher ANR; no dismissal')
 def reject_anr_window(data):
@@ -45,7 +45,8 @@ def run():
    owned();remote=REMOTE_FIXTURE;call(['push',str(db),remote]);call(install_fixture(path))
   instrument('reviewHistoricalFixtureWithoutChangingRawReadings',2);_,reviewed=snap(2);validate_final(before,fixture,reviewed)
   instrument('coldReviewAndResponsiveLayout',3);_,cold=snap(3);validate_final(before,fixture,cold);assert reviewed==cold,'Cold reopen changed stored review or original values'
-  result.update(status='PASSED',actualStoredEvidence={f'phase{i}-values.json':hashlib.sha256((proof/f'phase{i}-values.json').read_bytes()).hexdigest()for i in range(1,4)})
+  instrument('englishReviewGallery',4);_,english=snap(4);validate_final(before,fixture,english);assert cold==english,'Language gallery changed stored records'
+  result.update(status='PASSED',actualStoredEvidence={f'phase{i}-values.json':hashlib.sha256((proof/f'phase{i}-values.json').read_bytes()).hexdigest()for i in range(1,5)})
  except BaseException as e:result.update(status='FAILED',error=str(e))
  finally:
   if validated:
