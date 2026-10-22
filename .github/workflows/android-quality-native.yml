@@ -1,0 +1,75 @@
+name: WärmeTakt exact Android candidate native acceptance
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id: {type: string, required: true}
+      source_artifact_id: {type: string, required: true}
+      source_artifact_digest: {type: string, required: true}
+permissions: {contents: read}
+concurrency:
+  group: waermetakt-owned-native
+  cancel-in-progress: false
+env:
+  BUNDLETOOL_URL: https://github.com/google/bundletool/releases/download/1.18.2/bundletool-all-1.18.2.jar
+  BUNDLETOOL_SHA256: 378b5434cd1378bef6b2bc527b8c7f0ff2584b273830335bce54d6d0813c8584
+jobs:
+  native:
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'acciento89-bot/w-rmetakt'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions: {contents: read, actions: read}
+    env:
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      SOURCE_ARTIFACT_ID: ${{ inputs.source_artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ inputs.source_artifact_digest }}
+    steps:
+      - uses: actions/checkout@v5
+        with: {persist-credentials: false, fetch-depth: 0}
+      - name: Record exact source and check proof controller
+        run: |
+          mkdir -p "$RUNNER_TEMP/waermetakt-native-acceptance/waermetakt"
+          git rev-parse HEAD > "$RUNNER_TEMP/waermetakt-native-acceptance/waermetakt/source-commit.txt"
+          python3 -m unittest discover -s .github/waermetakt-native/tests -v
+      - uses: actions/setup-java@v5
+        with: {distribution: temurin, java-version: '17'}
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '9.5.0'}
+      - name: Bind the native run to the actual immutable signed candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 .github/waermetakt-native/download_candidate.py
+          curl -fsSL "$BUNDLETOOL_URL" -o "$RUNNER_TEMP/bundletool.jar"
+          printf '%s  %s\n' "$BUNDLETOOL_SHA256" "$RUNNER_TEMP/bundletool.jar" | sha256sum --check --strict
+          python3 .github/waermetakt-native/verify_bundle.py
+      - name: Build only the small external host and derive an exact-Dex QA APK
+        run: |
+          set -euo pipefail
+          gradle -p .github/waermetakt-native/host --no-daemon --max-workers=1 :app:assembleDebug :app:assembleDebugAndroidTest > "$RUNNER_TEMP/waermetakt-native-acceptance/waermetakt/host-build.log" 2>&1
+          python3 .github/waermetakt-native/derive_qa_apk.py
+      - name: Enable official KVM
+        run: test -e /dev/kvm && sudo chmod 666 /dev/kvm
+      - name: Actual free UI records, explicit historical comparison, reasoned exclusions and cold reopen
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_7
+          avd-name: WaermeTaktQualityAcceptance-35
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -memory 2048
+          disk-size: 4096M
+          disable-animations: true
+          script: bash .github/waermetakt-native/run-cloud.sh
+      - name: Encrypt bounded own synthetic evidence
+        if: always()
+        run: python3 .github/waermetakt-native/encrypt_evidence.py "$RUNNER_TEMP/waermetakt-native-acceptance/waermetakt" "$RUNNER_TEMP/waermetakt-native-encrypted/waermetakt/acceptance.cms"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: WaermeTakt-native-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/waermetakt-native-encrypted/waermetakt/acceptance.cms
+          if-no-files-found: warn
+          retention-days: 7

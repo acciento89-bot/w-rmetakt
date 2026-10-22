@@ -11,6 +11,8 @@ on:
       - "store/google-play/**"
       - "package*.json"
       - ".github/workflows/android-release.yml"
+      - ".github/waermetakt-release/**"
+      - ".github/waermetakt-native/**"
   push:
     branches: [main]
     paths:
@@ -22,6 +24,8 @@ on:
       - "store/google-play/**"
       - "package*.json"
       - ".github/workflows/android-release.yml"
+      - ".github/waermetakt-release/**"
+      - ".github/waermetakt-native/**"
   workflow_dispatch:
     inputs:
       build_bundle:
@@ -49,6 +53,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: node --test tests/*.test.mjs
+      - run: python3 -m unittest discover -s .github/waermetakt-release/tests -v
+      - run: python3 -m unittest discover -s .github/waermetakt-native/tests -v
       - name: Validate Play identity and launch icon configuration
         run: |
           set -euo pipefail
@@ -120,6 +126,8 @@ jobs:
       - run: npm ci
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
+      - name: Remove only generated disposable release signing
+        run: python3 .github/waermetakt-release/prepare_unsigned.py android/app/build.gradle
       - name: Build one exact Android candidate
         run: |
           set -euo pipefail
