@@ -2,6 +2,7 @@ name: WärmeTakt exact Android candidate native acceptance
 on:
   workflow_dispatch:
     inputs:
+      diagnostic_quality_only: {type: boolean, default: false, description: "Diagnostic-only fixture isolation; never acceptance"}
       source_run_id: {type: string, required: true}
       source_artifact_id: {type: string, required: true}
       source_artifact_digest: {type: string, required: true}
@@ -19,6 +20,7 @@ jobs:
     timeout-minutes: 30
     permissions: {contents: read, actions: read}
     env:
+      DIAGNOSTIC_QUALITY_ONLY: ${{ inputs.diagnostic_quality_only }}
       SOURCE_RUN_ID: ${{ inputs.source_run_id }}
       SOURCE_ARTIFACT_ID: ${{ inputs.source_artifact_id }}
       SOURCE_ARTIFACT_DIGEST: ${{ inputs.source_artifact_digest }}

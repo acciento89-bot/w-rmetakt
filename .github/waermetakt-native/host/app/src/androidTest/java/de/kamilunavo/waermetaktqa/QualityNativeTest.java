@@ -59,6 +59,9 @@ public final class QualityNativeTest {
   assertTrue(device.takeScreenshot(new File(proof,name+".png")));device.dumpWindowHierarchy(new File(proof,name+".xml"));
  }
 
+ /** Initializes only the empty owned app schema. This is never an ordinary-flow acceptance. */
+ @Test public void diagnosticInitializeOnly(){assertNotNull(find(id("nav-home")));}
+
  @Test public void ordinaryFreeExperimentAndMeasurement()throws Exception {
   text("Ersten Test starten →");present("Schritt 1/3");test("experiment-next");present("Schritt 2/3");test("experiment-next");present("Schritt 3/3");
   test("experiment-confirm");

@@ -13,7 +13,8 @@ def reject_anr_window(data):
  assert not re.search(rb'ANR in|Application Not Responding|isn.t responding',data,re.I),'Observed ANR window'
 def run():
  runtime=pathlib.Path(os.environ['RUNNER_TEMP']).resolve();proof=runtime/'waermetakt-native-acceptance/waermetakt';assert not proof.is_symlink() and not proof.parent.is_symlink();proof.mkdir(parents=True,exist_ok=True,mode=0o700)
- result={'status':'STARTED','package':APP,'version':'1.1.0(5)','realTransactions':False,'fixtureRecordsInjected':True,'fixtureScope':'Separate named qa-quality-golden experiment and eight Oct1..8 historical rows only in this workflow-owned emulator; ordinary free UI experiment/measurement and entitlements retained unchanged'};validated=False
+ diagnostic=os.environ.get('DIAGNOSTIC_QUALITY_ONLY','false')=='true'
+ result={'diagnosticOnly':diagnostic,'status':'STARTED','package':APP,'version':'1.1.0(5)','realTransactions':False,'fixtureRecordsInjected':True,'fixtureScope':('DIAGNOSTIC ONLY: explicit baseline plus historical rows, not actual ordinary UI creation. ' if diagnostic else '')+'Separate named qa-quality-golden experiment and eight Oct1..8 historical rows only in this workflow-owned emulator; ordinary free UI experiment/measurement and entitlements retained unchanged'};validated=False
  def call(args,timeout=20):
   p=subprocess.run(['adb','-s','emulator-5554',*args],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout)
   if p.returncode:raise RuntimeError('Owned adb command failed: '+args[0])
@@ -37,7 +38,16 @@ def run():
   for apk in apks:call(['install','-r',str(apk)],180)
   identity=call(['shell','dumpsys','package',APP]);(proof/'installed-identity.txt').write_bytes(identity);assert re.search(rb'\bversionCode=5(?=\s|$)',identity)and re.search(rb'\bversionName=1\.1\.0(?=\s|$)',identity)
   for forbidden in [b'ALLOW_BACKUP',b'android.permission.RECORD_AUDIO',b'android.permission.SYSTEM_ALERT_WINDOW',b'android.permission.READ_EXTERNAL_STORAGE',b'android.permission.WRITE_EXTERNAL_STORAGE',b'com.google.android.gms.permission.AD_ID']:assert forbidden not in identity,'Unexpected backup/permission: '+forbidden.decode()
-  instrument('ordinaryFreeExperimentAndMeasurement',1);path,before=snap(1)
+  if diagnostic:
+   instrument('diagnosticInitializeOnly',1);path,before=snap(1)
+   assert not any(before.values()),'Diagnostic isolation requires the fresh empty own app database'
+   c=sqlite3.connect(proof/'phase1-waermetakt.db')
+   c.execute("INSERT INTO experiments VALUES ('diagnostic-only-baseline','heatingCurve','0.6','0.5','',7,'2026-10-22T00:00:00.000Z','active')")
+   c.execute("INSERT INTO measurements VALUES ('diagnostic-only-reading','2026-10-22T12:00:00.000Z','after',5.1,18.4,4.2,21,8,35,29,6.2,3)")
+   c.commit();before=snapshot(c);c.close()
+   (proof/'phase1-values.json').write_text(json.dumps(before,indent=2)+'\n')
+  else:
+   instrument('ordinaryFreeExperimentAndMeasurement',1);path,before=snap(1)
   # Only this fresh workflow-owned AOSP image is modified; fixture code is never shipped.
   with tempfile.TemporaryDirectory(dir=runtime,prefix='waermetakt-explicit-fixture-')as temp:
    db=pathlib.Path(temp)/'waermetakt.db';src=sqlite3.connect(proof/'phase1-waermetakt.db');dst=sqlite3.connect(db);src.backup(dst);src.close();seed(dst);fixture=snapshot(dst);dst.execute('PRAGMA wal_checkpoint(TRUNCATE)');dst.execute('PRAGMA journal_mode=DELETE');dst.close()
@@ -45,7 +55,7 @@ def run():
    owned();remote=REMOTE_FIXTURE;call(['push',str(db),remote]);call(install_fixture(path))
   instrument('reviewHistoricalFixtureWithoutChangingRawReadings',2);_,reviewed=snap(2);validate_final(before,fixture,reviewed)
   instrument('coldReviewAndResponsiveLayout',3);_,cold=snap(3);validate_final(before,fixture,cold);assert reviewed==cold,'Cold reopen changed stored review or original values'
-  result.update(status='PASSED',actualStoredEvidence={f'phase{i}-values.json':hashlib.sha256((proof/f'phase{i}-values.json').read_bytes()).hexdigest()for i in range(1,4)})
+  result.update(status='DIAGNOSTIC_ONLY' if diagnostic else 'PASSED',actualStoredEvidence={f'phase{i}-values.json':hashlib.sha256((proof/f'phase{i}-values.json').read_bytes()).hexdigest()for i in range(1,4)})
  except BaseException as e:result.update(status='FAILED',error=str(e))
  finally:
   if validated:
