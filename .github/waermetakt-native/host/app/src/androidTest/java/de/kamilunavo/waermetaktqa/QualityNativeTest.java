@@ -94,13 +94,13 @@ public final class QualityNativeTest {
   expect("+50%");expect("+100 Prozentpunkte");capture("05-reasoned-comparison");
  }
  @Test public void englishReviewGallery()throws Exception {
-  test("nav-settings");text("English");text("Celsius (°C)");test("nav-tests");expect("Test a setting.");
+  test("nav-settings");text("English");text("Celsius (°C)");test("nav-tests");expect("Recommendations");
   openGolden();goldenDates();capture("09-english-review");
   expect("All selected days");expect("After explicit selection");expect("+50%");expect("+100 percentage points");capture("10-english-comparison");
  }
  @Test public void coldReviewAndResponsiveLayout()throws Exception {
   openGolden();goldenDates();expect("QA meter check");expect("+50%");expect("+100 Prozentpunkte");capture("06-cold-reviewed");
   device.setOrientationLeft();device.waitForIdle();top();assertEquals("2026-10-01",find(id("quality-beforeStart")).getText());capture("07-wide-review");device.setOrientationNatural();device.waitForIdle();
-  expect("+100 Prozentpunkte");test("quality-back");test("nav-tests");expect("Einstellung testen.");capture("08-original-analysis-retained");
+  expect("+100 Prozentpunkte");test("quality-back");test("nav-tests");expect("Empfehlungen");capture("08-original-analysis-retained");
  }
 }
