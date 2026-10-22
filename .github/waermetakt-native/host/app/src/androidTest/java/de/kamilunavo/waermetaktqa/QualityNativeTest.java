@@ -65,8 +65,11 @@ public final class QualityNativeTest {
   // Native idleness does not imply that React has committed the new confirmation state.
   assertTrue("Confirmation must be rendered before the dependent start tap",device.wait(Until.hasObject(id("experiment-confirm").checked(true)),10000));
   assertTrue("Start must be enabled after confirmation",device.wait(Until.hasObject(id("experiment-next").enabled(true)),10000));
-  test("experiment-next");
-  assertTrue(device.wait(Until.hasObject(By.res(Pattern.compile("(?:"+Pattern.quote(APP)+":id/)?quality-open-.+"))),10000));capture("01-ordinary-experiment");
+  // Use a deliberate finger-length press after the native disabled→enabled transition.
+  // Keep the real post-save navigation assertion; never retry a possibly successful save.
+  unique(id("experiment-next")).click(200);
+  assertTrue("Start must leave the wizard",device.wait(Until.gone(id("experiment-confirm")),10000));
+  assertNotNull(find(By.res(Pattern.compile("(?:"+Pattern.quote(APP)+":id/)?quality-open-.+"))));capture("01-ordinary-experiment");
   test("nav-entry");test("measurement-save");test("nav-history");assertNotNull(find(By.textContains("5.1")));capture("02-ordinary-measurement");
  }
  private void openGolden(){test("nav-tests");test("quality-open-qa-quality-golden");assertTrue(device.wait(Until.hasObject(id("quality-beforeStart")),10000));}
