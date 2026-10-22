@@ -46,9 +46,15 @@ const defaultProfile: SystemProfile = {
   electricityPrice: '0.32',
 };
 
-let connection: SQLite.SQLiteDatabase | undefined;
-async function db() {
-  if (!connection) connection = await SQLite.openDatabaseAsync('waermetakt.db');
+// Cache the in-flight open as well as its result. App startup and purchase-state
+// startup run concurrently; both must retain the same native connection wrapper.
+let connection: Promise<SQLite.SQLiteDatabase> | undefined;
+let initialization: Promise<void> | undefined;
+function db(): Promise<SQLite.SQLiteDatabase> {
+  if (!connection) connection = SQLite.openDatabaseAsync('waermetakt.db').catch((error: unknown) => {
+    connection = undefined;
+    throw error;
+  });
   return connection;
 }
 
@@ -68,36 +74,42 @@ async function ensureMeasurementColumns(client: SQLite.SQLiteDatabase) {
 
 export const database = {
   async initialize() {
-    const client = await db();
-    await client.execAsync(`
-      PRAGMA journal_mode = WAL;
-      CREATE TABLE IF NOT EXISTS measurements (
-        id TEXT PRIMARY KEY NOT NULL,
-        measured_at TEXT NOT NULL,
-        phase TEXT NOT NULL,
-        electricity_kwh REAL NOT NULL,
-        heat_kwh REAL NOT NULL,
-        outside_c REAL NOT NULL,
-        room_c REAL NOT NULL,
-        compressor_starts INTEGER NOT NULL,
-        flow_c REAL NOT NULL DEFAULT 0,
-        return_c REAL NOT NULL DEFAULT 0,
-        compressor_hours REAL NOT NULL DEFAULT 0,
-        hot_water_kwh REAL NOT NULL DEFAULT 0
-      );
-      CREATE TABLE IF NOT EXISTS experiments (
-        id TEXT PRIMARY KEY NOT NULL,
-        setting TEXT NOT NULL,
-        previous_value TEXT NOT NULL,
-        new_value TEXT NOT NULL,
-        unit TEXT NOT NULL,
-        duration_days INTEGER NOT NULL,
-        started_at TEXT NOT NULL,
-        status TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
-    `);
-    await ensureMeasurementColumns(client);
+    if (!initialization) initialization = (async () => {
+      const client = await db();
+      await client.execAsync(`
+        PRAGMA journal_mode = WAL;
+        CREATE TABLE IF NOT EXISTS measurements (
+          id TEXT PRIMARY KEY NOT NULL,
+          measured_at TEXT NOT NULL,
+          phase TEXT NOT NULL,
+          electricity_kwh REAL NOT NULL,
+          heat_kwh REAL NOT NULL,
+          outside_c REAL NOT NULL,
+          room_c REAL NOT NULL,
+          compressor_starts INTEGER NOT NULL,
+          flow_c REAL NOT NULL DEFAULT 0,
+          return_c REAL NOT NULL DEFAULT 0,
+          compressor_hours REAL NOT NULL DEFAULT 0,
+          hot_water_kwh REAL NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS experiments (
+          id TEXT PRIMARY KEY NOT NULL,
+          setting TEXT NOT NULL,
+          previous_value TEXT NOT NULL,
+          new_value TEXT NOT NULL,
+          unit TEXT NOT NULL,
+          duration_days INTEGER NOT NULL,
+          started_at TEXT NOT NULL,
+          status TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+      `);
+      await ensureMeasurementColumns(client);
+    })().catch((error: unknown) => {
+      initialization = undefined;
+      throw error;
+    });
+    return initialization;
   },
 
   async listMeasurements(): Promise<Measurement[]> {
