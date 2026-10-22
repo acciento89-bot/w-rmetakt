@@ -1,0 +1,112 @@
+{
+  "nativeRun": 39759890848,
+  "productSource": "f46363c97d462fb929d19224924ecb2a92e08bd0",
+  "method": "Code-native SVG layout around an unscaled, uncropped native screenshot; native bitmap region independently compared pixel-for-pixel. English entries 3/4 show the actual selectable German interface.",
+  "files": [
+    {
+      "locale": "de-DE",
+      "file": "01-vergleichen.png",
+      "nativeFrame": "01-ordinary-experiment",
+      "sourceSha256": "7519f984578e55e5d5bdf2ed6d377b0457684300914b34365a1a0298a387800f",
+      "sha256": "816c352977d7c06754f00390d9b50f8c3cd8ee346abfa2df80a52c16d14a1605",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "nativeUiPixelsUnchanged": true,
+      "taglineHeightFraction": 0.0625,
+      "bytes": 139894
+    },
+    {
+      "locale": "de-DE",
+      "file": "02-tageswerte.png",
+      "nativeFrame": "02-ordinary-measurement",
+      "sourceSha256": "cf6ca2f4feb97576e1b5bab8d410f926a9c2b798e9854a5b07eebf33930aac4e",
+      "sha256": "ac6b7c518da7c927dcb3a4540005a66cd13cb667b8eeee74ab31488d1f78d2e4",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "nativeUiPixelsUnchanged": true,
+      "taglineHeightFraction": 0.0625,
+      "bytes": 102877
+    },
+    {
+      "locale": "de-DE",
+      "file": "03-zeitraeume.png",
+      "nativeFrame": "03-all-selected-golden",
+      "sourceSha256": "372a5ed2435fe20395c894681839736867fd0ea972085153c30893a8f78b9a2f",
+      "sha256": "f1830c2d7a5659a968cb58f744161c2ece8f3373b77c68b3c3acd6ee0dd01815",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "nativeUiPixelsUnchanged": true,
+      "taglineHeightFraction": 0.0625,
+      "bytes": 147755
+    },
+    {
+      "locale": "de-DE",
+      "file": "04-auswahlwirkung.png",
+      "nativeFrame": "05-reasoned-comparison",
+      "sourceSha256": "2e03222df153c05a7ad98dd5adbcde78136b05a7fc9fb6172eb6fa7a296204cc",
+      "sha256": "2232ffa3bc13e5b77cba0cb43989f363c454853a49f8e3ca865615ffb76e7def",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "nativeUiPixelsUnchanged": true,
+      "taglineHeightFraction": 0.0625,
+      "bytes": 168692
+    },
+    {
+      "locale": "en-US",
+      "file": "01-comparison.png",
+      "nativeFrame": "09-english-review",
+      "sourceSha256": "ed89af752f947cc3ae2b015e0330b8759f6cf7e12c0703c7884da5f904c6fe92",
+      "sha256": "06f6fdb90f83e0bb38abc51da54109b3116fbf4bd9a895b5f0bcaa0f222c156a",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "nativeUiPixelsUnchanged": true,
+      "taglineHeightFraction": 0.0625,
+      "bytes": 150680
+    },
+    {
+      "locale": "en-US",
+      "file": "02-selection.png",
+      "nativeFrame": "10-english-comparison",
+      "sourceSha256": "ba0b57d1794354d675a5912eb7b3673660c1541626f99dff3ded0eeee5453dd8",
+      "sha256": "44afed0d05a559a3f967f1c61fe5a6e65a6ec1830b91b288fedd40e567e197c0",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "nativeUiPixelsUnchanged": true,
+      "taglineHeightFraction": 0.0625,
+      "bytes": 161579
+    },
+    {
+      "locale": "en-US",
+      "file": "03-readings.png",
+      "nativeFrame": "02-ordinary-measurement",
+      "sourceSha256": "cf6ca2f4feb97576e1b5bab8d410f926a9c2b798e9854a5b07eebf33930aac4e",
+      "sha256": "72c8a39ff0d0f4e7dcc641026e0ec037a721e0d8a9947020488a0da66005d53a",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "nativeUiPixelsUnchanged": true,
+      "taglineHeightFraction": 0.0625,
+      "bytes": 100093
+    },
+    {
+      "locale": "en-US",
+      "file": "04-analysis.png",
+      "nativeFrame": "01-ordinary-experiment",
+      "sourceSha256": "7519f984578e55e5d5bdf2ed6d377b0457684300914b34365a1a0298a387800f",
+      "sha256": "5ff88180e1d2ae83e8d8ff35d211292fc06581aa332fc78fa604387a689b6179",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "nativeUiPixelsUnchanged": true,
+      "taglineHeightFraction": 0.0625,
+      "bytes": 138238
+    }
+  ],
+  "policyReference": "https://support.google.com/googleplay/android-developer/answer/9866151?hl=en"
+}
