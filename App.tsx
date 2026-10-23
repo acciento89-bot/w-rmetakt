@@ -5,7 +5,8 @@ import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-
 import { database, Experiment, Measurement, SystemProfile } from './src/database';
 import { analyzeMeasurements, InsightKey } from './src/domain';
 import { flowStrings, Language, qualityStrings, strings, unitStrings } from './src/i18n';
-import { useProPurchase } from './src/useProPurchase';
+import { PurchaseBoundary } from './src/PurchaseBoundary';
+import type { useProPurchase } from './src/useProPurchase';
 import { QualityReviewScreen } from './src/QualityReviewScreen';
 
 type Screen = 'home' | 'tests' | 'newTest' | 'entry' | 'history' | 'settings' | 'pro' | 'quality';
@@ -97,11 +98,11 @@ const extra = {
   },
 } as const;
 
-export default function App() {
-  return <SafeAreaProvider><AppContent /></SafeAreaProvider>;
+export default function App({ providerDisabledForQA }: { providerDisabledForQA?: boolean }) {
+  return <SafeAreaProvider><PurchaseBoundary disabledForQA={providerDisabledForQA} render={(purchase) => <AppContent purchase={purchase} />} /></SafeAreaProvider>;
 }
 
-function AppContent() {
+function AppContent({ purchase }: { purchase: ReturnType<typeof import('./src/useProPurchase').useProPurchase> }) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const [headerHeight, setHeaderHeight] = useState(76);
@@ -113,7 +114,6 @@ function AppContent() {
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [profile, setProfile] = useState<SystemProfile>({ manufacturer: '', model: '', buildingArea: '', constructionYear: '', heatDistribution: 'floor', electricityPrice: '0.32' });
   const [isReady, setIsReady] = useState(false);
-  const purchase = useProPurchase();
   const t = { ...strings[language], ...unitStrings[language], ...flowStrings[language], ...extra[language], qualityOpen: qualityStrings[language].open };
 
   useEffect(() => {
