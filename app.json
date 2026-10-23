@@ -41,7 +41,15 @@
     "plugins": [
       "expo-sqlite",
       "./plugins/with-space-safe-ios.cjs",
-      "./plugins/with-provider-isolated-qa.cjs"
+      "./plugins/with-provider-isolated-qa.cjs",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ]
     ]
   }
 }
