@@ -1,0 +1,5 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {initialDisplaySettings} from '../src/systemLocale.ts';
+test('native iOS language and regional units override Hermes fallback locale',()=>{assert.deepEqual(initialDisplaySettings({AppleLanguages:['de-DE'],AppleLocale:'de_DE'},'en-US'),{language:'de',unitSystem:'metric'});assert.deepEqual(initialDisplaySettings({AppleLanguages:['en-US'],AppleLocale:'de_DE'},'en-US'),{language:'en',unitSystem:'metric'});assert.deepEqual(initialDisplaySettings({AppleLanguages:['de'],AppleLocale:'en_US'},'de-DE'),{language:'de',unitSystem:'imperial'});});
+test('Android and malformed native locale values safely retain existing Intl defaults',()=>{assert.deepEqual(initialDisplaySettings({},'de-DE'),{language:'de',unitSystem:'metric'});assert.deepEqual(initialDisplaySettings({AppleLanguages:42,AppleLocale:null},'en-US'),{language:'en',unitSystem:'imperial'});assert.deepEqual(initialDisplaySettings({AppleLanguages:['',null,'xx'],AppleLocale:42},'en-GB'),{language:'en',unitSystem:'metric'});});

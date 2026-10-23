@@ -8,10 +8,19 @@ import { flowStrings, Language, qualityStrings, strings, unitStrings } from './s
 import { PurchaseBoundary } from './src/PurchaseBoundary';
 import type { useProPurchase } from './src/useProPurchase';
 import { QualityReviewScreen } from './src/QualityReviewScreen';
+import { initialDisplaySettings } from './src/systemLocale';
 
 type Screen = 'home' | 'tests' | 'newTest' | 'entry' | 'history' | 'settings' | 'pro' | 'quality';
 type UnitSystem = 'metric' | 'imperial';
 
+function nativeDisplayPreferences(): unknown {
+  if (Platform.OS !== 'ios') return {};
+  try {
+    const manager = NativeModules.SettingsManager;
+    return manager?.getConstants?.()?.settings ?? manager?.settings ?? {};
+  } catch { return {}; }
+}
+const systemDisplay = initialDisplaySettings(nativeDisplayPreferences(), Intl.DateTimeFormat().resolvedOptions().locale);
 const screenshotMode = process.env.EXPO_PUBLIC_SCREENSHOT_MODE === '1';
 const screenshotSettings = NativeModules.SettingsManager?.settings ?? {};
 const screenshotRoute = (process.env.EXPO_PUBLIC_SCREENSHOT_ROUTE ?? screenshotSettings.ScreenshotRoute) as Screen | undefined;
@@ -108,8 +117,8 @@ function AppContent({ purchase }: { purchase: ReturnType<typeof import('./src/us
   const [headerHeight, setHeaderHeight] = useState(76);
   const [reviewExperimentId, setReviewExperimentId] = useState<string | null>(null);
   const [screen, setScreen] = useState<Screen>(() => screenshotMode && screenshotRoute ? screenshotRoute : 'home');
-  const [language, setLanguage] = useState<Language>(() => screenshotMode && screenshotLanguage ? screenshotLanguage : Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase().startsWith('de') ? 'de' : 'en');
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => screenshotMode && screenshotLanguage ? (screenshotLanguage === 'en' ? 'imperial' : 'metric') : Intl.DateTimeFormat().resolvedOptions().locale.toUpperCase().includes('-US') ? 'imperial' : 'metric');
+  const [language, setLanguage] = useState<Language>(() => screenshotMode && screenshotLanguage ? screenshotLanguage : systemDisplay.language);
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => screenshotMode && screenshotLanguage ? (screenshotLanguage === 'en' ? 'imperial' : 'metric') : systemDisplay.unitSystem);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [profile, setProfile] = useState<SystemProfile>({ manufacturer: '', model: '', buildingArea: '', constructionYear: '', heatDistribution: 'floor', electricityPrice: '0.32' });
