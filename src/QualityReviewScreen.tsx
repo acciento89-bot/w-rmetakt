@@ -1,5 +1,6 @@
+import { Text, TextInput } from './product-type';
 import { useEffect, useMemo, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { Experiment, Measurement } from './database';
 import { database } from './database';
 import { assessQualityReview, defaultQualityReview, validateQualityReview } from './experimentQuality';
@@ -74,11 +75,11 @@ export function QualityReviewScreen({ experiment, measurements, language, unitSy
 const s = StyleSheet.create({
   flex: { flex: 1 }, scroll: { padding: 20, paddingBottom: 40, gap: 14 }, title: { fontSize: 28, fontWeight: '800', color: '#102C28' },
   section: { fontSize: 18, fontWeight: '700', color: '#102C28', flexShrink: 1 }, body: { fontSize: 15, lineHeight: 22, color: '#36584F', flexShrink: 1 },
-  label: { fontSize: 14, fontWeight: '700', color: '#102C28', marginTop: 6 }, card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#A9CDBB', padding: 16, borderRadius: 18, gap: 10 },
+  label: { fontSize: 14, fontWeight: '700', color: '#102C28', marginTop: 6 }, card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#A9CDBB', padding: 16, borderRadius: 3, borderLeftWidth: 4, gap: 10 },
   fields: { gap: 14 }, wideFields: { flexDirection: 'row', flexWrap: 'wrap' }, field: { gap: 6 }, wideField: { width: '47%', flexGrow: 1 },
-  input: { borderWidth: 1, borderColor: '#547068', borderRadius: 10, minHeight: 48, padding: 12, fontSize: 17, color: '#102C28', backgroundColor: '#F0F7F2' },
+  input: { borderWidth: 1, borderColor: '#547068', borderRadius: 3, minHeight: 48, padding: 12, fontSize: 17, color: '#102C28', backgroundColor: '#F0F7F2' },
   reason: { minHeight: 90, textAlignVertical: 'top' }, decision: { gap: 10, borderTopWidth: 1, borderColor: '#BEDDCB', paddingTop: 12 },
-  button: { minHeight: 48, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#16796A', justifyContent: 'center' }, buttonText: { color: '#123A35', fontWeight: '700', fontSize: 15, textAlign: 'center', flexShrink: 1 },
+  button: { minHeight: 48, padding: 14, borderRadius: 3, borderWidth: 1, borderColor: '#16796A', justifyContent: 'center' }, buttonText: { color: '#123A35', fontWeight: '700', fontSize: 15, textAlign: 'center', flexShrink: 1 },
   primary: { backgroundColor: '#123A35' }, primaryText: { color: '#FFFFFF' }, disabled: { opacity: 0.45 }, result: { fontSize: 24, fontWeight: '800', color: '#123A35' },
   warning: { padding: 14, gap: 12, backgroundColor: '#FFF2D5', borderRadius: 12 }, error: { color: '#92382B', fontSize: 15, lineHeight: 22 }, status: { color: '#185147', fontSize: 16, lineHeight: 23, fontWeight: '600' },
   reading: { borderTopWidth: 1, borderColor: '#BEDDCB', paddingTop: 10, gap: 6 }, excluded: { backgroundColor: '#EAF5EE' },
