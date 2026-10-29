@@ -3,6 +3,9 @@ import { ActivityIndicator, StyleSheet, Text as NativeText, TextInput as NativeT
 import { useFonts } from 'expo-font';
 import type { PropsWithChildren, ElementRef } from 'react';
 import type { StyleProp, TextProps, TextInputProps, TextStyle } from 'react-native';
+// Bundle the original font license as a local asset alongside the font files.
+require('../assets/fonts/cambay/OFL.txt');
+
 const Ready = createContext(false);
 const fontAssets = {
   cambayRegular: require('../assets/fonts/cambay/Cambay-Regular.ttf'),
