@@ -2,7 +2,7 @@
   "expo": {
     "name": "WärmeTakt",
     "slug": "waermetakt",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "scheme": "waermetakt",
     "description": "Herstellerunabhängige Effizienzanalyse für Wärmepumpen.",
     "githubUrl": "https://github.com/acciento89-bot/w-rmetakt",
@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "de.kamilunavo.waermetakt",
-      "versionCode": 5,
+      "versionCode": 6,
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
       "blockedPermissions": [

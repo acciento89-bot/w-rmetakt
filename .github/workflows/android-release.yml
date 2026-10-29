@@ -60,7 +60,7 @@ jobs:
           set -euo pipefail
           node - <<'NODE'
           const a=require('./app.json').expo;
-          if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==5||a.version!=='1.1.0') process.exit(1);
+          if(a.android.package!=='de.kamilunavo.waermetakt'||a.android.versionCode!==6||a.version!=='1.2.0') process.exit(1);
           if(a.icon!==a.splash?.image) throw new Error('WärmeTakt splash image must match expo.icon');
           if(a.android.adaptiveIcon!==undefined) throw new Error('Adaptive launcher variants must remain disabled');
           NODE
@@ -138,7 +138,7 @@ jobs:
           (cd candidate && sha256sum app-release.aab > app-release.aab.sha256)
       - uses: actions/upload-artifact@v4
         with:
-          name: waermetakt-1.1.0-5-android-release
+          name: waermetakt-1.2.0-6-android-release
           path: candidate/
           if-no-files-found: error
           retention-days: 30
